@@ -1,4 +1,6 @@
 
+package agh.po.lab1;
+
 public class Choinka {
     public static void main(String[] args) {
         int x = Integer.parseInt(args[0]);
