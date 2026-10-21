@@ -1,6 +1,5 @@
-package agh.po.lab1;
+package agh.po.lab2;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Random;
 
 public class Lotto {
@@ -15,12 +14,16 @@ public class Lotto {
             }
         }
 
+        ArrayList<Integer> Args = new ArrayList<>();
 
-//        boolean jest = lista.contains(7); // true
+        for (String arg : args) {
+            Args.add(Integer.parseInt(arg));
+        }
 
-        System.out.println("Twoje typy: " + Arrays.toString(args));
-        System.out.print("Wylosowane liczby: " + list);
-//      System.out.print("Liczba trafien: " + args.retainAll(list);
+        System.out.println("Twoje typy: " + Args);
+        System.out.println("Wylosowane liczby: " + list);
+        Args.retainAll(list);
+        System.out.print("Liczba trafien: " + Args.size());
 
     }
 }
