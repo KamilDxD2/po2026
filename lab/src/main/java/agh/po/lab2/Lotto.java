@@ -16,7 +16,7 @@ public class Lotto {
 
         ArrayList<Integer> Args = new ArrayList<>();
 
-        for (String arg : args) {
+        for (String arg : args) { // odpowiednik foreach w JS
             Args.add(Integer.parseInt(arg));
         }
 
