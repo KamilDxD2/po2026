@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>agh.po.bomberman</groupId>
+    <artifactId>core</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <teavm.version>0.16.0</teavm.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.teavm</groupId>
+            <artifactId>teavm-jso-apis</artifactId>
+            <version>${teavm.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.teavm</groupId>
+            <artifactId>teavm-classlib</artifactId>
+            <version>${teavm.version}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.teavm</groupId>
+                <artifactId>teavm-maven-plugin</artifactId>
+                <version>${teavm.version}</version>
+                <executions>
+                    <execution>
+                        <id>compile-wasm</id>
+                        <goals><goal>compile</goal></goals>
+                        <phase>process-classes</phase>
+                        <configuration>
+                            <mainClass>agh.po.bomberman.controller.GameEngine</mainClass>
+                            <targetDirectory>${project.basedir}/../ui/public/wasm</targetDirectory>
+                            <targetFileName>classes.wasm</targetFileName>
+                            <targetType>WEBASSEMBLY_GC</targetType>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>generate-runtime</id>
+                        <goals><goal>copy-webassembly-gc-runtime</goal></goals>
+                        <phase>process-classes</phase>
+                        <configuration>
+                            <targetDirectory>${project.basedir}/../ui/public/wasm</targetDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
