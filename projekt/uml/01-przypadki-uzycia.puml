@@ -1,38 +1,101 @@
 @startuml
 left to right direction
 
-' TODO: zastąpcie "Użytkownik" właściwą nazwą aktora (np. Klient, Pracownik,
-' Administrator...) i dodajcie kolejnych aktorów, jeśli ich macie więcej.
-actor "Użytkownik" as User
+skinparam UseCase {
+    BackgroundColor LightCyan
+    BorderColor DarkSlateGray
+    ArrowColor SlateGray
+    FontName Arial
+}
+skinparam Actor {
+    BackgroundColor White
+    BorderColor DarkSlateGray
+    FontName Arial
+}
+skinparam Rectangle {
+    BorderColor DarkSlateGray
+    FontStyle bold
+}
+skinparam ArrowFontSize 11
 
-package "Nazwa waszej aplikacji" {
+' ==========================================
+' ACTORS
+' Player (left): everything triggered by input.
+' Time (right): everything that happens on its own.
+' ==========================================
+actor "Player" as player
+actor "Time" as time
 
-    ' TODO: to są tylko przykładowe, generyczne przypadki użycia.
-    ' Zastąpcie je / dopiszcie własne, dopasowane do waszego tematu projektu.
-    usecase "Zaloguj się" as UC_Login
-    usecase "Przeglądaj dane" as UC_Browse
-    usecase "Dodaj nowy element" as UC_Add
-    usecase "Edytuj istniejący element" as UC_Edit
-    usecase "Usuń element" as UC_Delete
+rectangle "Bomberman (NES 1985)" {
 
-    User --> UC_Login
-    User --> UC_Browse
-    User --> UC_Add
-    User --> UC_Edit
-    User --> UC_Delete
+    ' Column 1: player goals
+    usecase "Start New Game" as UC_Start
+    usecase "Load Saved Game" as UC_Load
+    ' Done from the pause menu; replaces the NES password system.
+    usecase "Save Game" as UC_Save
+    usecase "Pause / Resume" as UC_Pause
+    usecase "Move Bomberman" as UC_Move
+    usecase "Place Bomb" as UC_PlaceBomb
+    ' Needs the Detonator power-up; sets off the oldest bomb.
+    usecase "Detonate Bomb Remotely" as UC_Remote
 
-    ' Przykład relacji <<include>> — UC_Add zawsze wymaga bycia zalogowanym.
-    UC_Add .> UC_Login : <<include>>
-    UC_Edit .> UC_Login : <<include>>
-    UC_Delete .> UC_Login : <<include>>
+    ' Column 2: consequences
+    usecase "Pick Up Power-up" as UC_PickUp
+    ' Leads to the next stage; after stage 50 the game is won.
+    usecase "Exit Stage" as UC_Exit
+    ' Restarts the stage. All power-ups except Bombs and Flames are lost.
+    usecase "Lose Life" as UC_LoseLife
+    ' Bombing an exposed power-up only destroys it (project decision,
+    ' unlike the NES original, where it also spawns enemies).
+    usecase "Spawn Enemy Wave" as UC_Spawn
+
+    ' Column 3: end of game and events driven by time
+    usecase "End Game" as UC_EndGame
+    usecase "Move Enemies" as UC_MoveEnemies
+    ' Blast spreads in 4 directions up to the fire range: destroys soft
+    ' blocks (revealing a hidden power-up or the door), kills enemies
+    ' (adds score) and detonates other bombs it reaches (chain reaction).
+    usecase "Explode Bomb" as UC_Explode
+    ' After 200 seconds, Pontans flood the stage.
+    usecase "Run Out of Stage Time" as UC_TimeOut
 }
 
-' Wskazówki:
-' - left to right direction układa aktorów po lewej, przypadki po prawej
-'   (czytelniejsze przy więcej niż 1 aktorze).
-' - <<include>> = przypadek ZAWSZE wywołuje inny jako swoją część.
-' - <<extend>> = przypadek OPCJONALNIE rozszerza inny, tylko w pewnych warunkach.
-' - Grupujcie powiązane przypadki użycia w podpakiety (package "Nazwa grupy" { ... }),
-'   jeśli macie ich więcej niż 5-6 — tak jak w materiale z zajęć (system biblioteczny).
+' ==========================================
+' ACTOR ASSOCIATIONS
+' ==========================================
+player -- UC_Start
+player -- UC_Load
+player -- UC_Save
+player -- UC_Pause
+player -- UC_Move
+player -- UC_PlaceBomb
+player -- UC_Remote
+
+UC_MoveEnemies -- time
+UC_Explode -- time
+UC_TimeOut -- time
+
+' ==========================================
+' EXTEND: optional, only when the [condition] holds.
+' The arrow points from the extension to the base use case.
+' ==========================================
+UC_Move <.. UC_PickUp : <<extend>>\n[power-up on tile]
+UC_Move <.. UC_Exit : <<extend>>\n[door on tile, no enemies left]
+UC_Move <.. UC_LoseLife : <<extend>>\n[walks into enemy,\nnot invincible]
+
+UC_LoseLife <.. UC_EndGame : <<extend>>\n[no lives left]
+UC_LoseLife ..> UC_MoveEnemies : <<extend>>\n[enemy reaches player,\nnot invincible]
+UC_LoseLife ..> UC_Explode : <<extend>>\n[player in blast, no Flame Pass,\nnot invincible]
+UC_Spawn ..> UC_Explode : <<extend>>\n[blast hits exposed door]
+
+' ==========================================
+' INCLUDE: the base use case always performs the included one.
+' The arrow points from the base to the included use case.
+' ==========================================
+UC_Remote ..> UC_Explode : <<include>>
+UC_Spawn <.. UC_TimeOut : <<include>>
+
+' Layout only: keeps "Detonate Bomb Remotely" in the Player column.
+UC_Remote -[hidden]- UC_Spawn
 
 @enduml
