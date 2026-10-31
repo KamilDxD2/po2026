@@ -2,6 +2,12 @@
 title Explode Bomb
 
 hide footbox
+
+legend top right
+  |<#E6E6E6> View (React / TypeScript) |
+  |<#CFE3F7> Controller (Java) |
+  |<#D8F0D8> Model (Java) |
+endlegend
 autonumber
 
 skinparam ParticipantBackgroundColor LightCyan
@@ -11,7 +17,6 @@ skinparam ActorBorderColor DarkSlateGray
 skinparam ArrowColor SlateGray
 skinparam SequenceLifeLineBorderColor SlateGray
 skinparam SequenceGroupBorderColor DarkSlateGray
-skinparam SequenceBoxBorderColor DarkSlateGray
 skinparam DefaultFontName Arial
 skinparam note {
     BackgroundColor LightYellow
@@ -19,31 +24,27 @@ skinparam note {
 }
 
 ' ==========================================
-' Participants, grouped by MVC layer.
+' Participants, coloured by MVC layer (see legend).
 ' Board  = static terrain: hard/soft blocks, hidden items, the door.
 ' Stage  = everything that moves or changes: player, enemies,
 '          bombs, explosions.
+' "In a cell" = the cell under the creature's center, as in
+' "Move Bomberman".
 ' ==========================================
 actor "Time" as time
 
-box "View (React / TypeScript)" #WhiteSmoke
-    participant "GameLoop" as view
-end box
+participant "GameLoop" as view #E6E6E6
 
-box "Controller (Java)" #AliceBlue
-    participant "GameBridge" as bridge
-end box
+participant "GameBridge" as bridge #CFE3F7
 
-box "Model (Java)" #Honeydew
-    participant "game : Game" as game
-    participant "stage : Stage" as stage
-    participant "bomb : Bomb" as bomb
-    participant "explosion : Explosion" as explosion
-    participant "board : Board" as board
-    participant "enemy : Enemy" as enemy
-    participant "player : Player" as player
-    participant "EnemyFactory" as factory
-end box
+participant "game : Game" as game #D8F0D8
+participant "stage : Stage" as stage #D8F0D8
+participant "bomb : Bomb" as bomb #D8F0D8
+participant "explosion : Explosion" as explosion #D8F0D8
+participant "board : Board" as board #D8F0D8
+participant "enemy : Enemy" as enemy #D8F0D8
+participant "player : Player" as player #D8F0D8
+participant "EnemyFactory" as factory #D8F0D8
 
 ' ==========================================
 ' One frame in which at least one fuse runs out
@@ -54,9 +55,11 @@ bridge -> game : update(input)
 game -> stage : update(input)
 
 note over game, board
-  Everything from here until the frame is drawn
-  runs within one tick (1/60 s), so the player sees
-  the whole explosion appear at once.
+  Everything from here until the frame is drawn runs within
+  one tick (1/60 s), so the player sees the whole explosion
+  appear at once. Order of stage.update(): 1. the player
+  ("Move Bomberman"), 2. bombs (this diagram), 3. enemies
+  ("Move Enemies").
 end note
 
 loop for each bomb on the stage
@@ -145,14 +148,11 @@ loop while explosionQueue is not empty
         opt power-up
             stage -> board : removeItem(cell)
         end
-        stage -> factory : createWave(stageNumber, cell, 10 - livingEnemyCount())
-        factory --> stage : newEnemies
-        stage -> stage : enemies.addAll(newEnemies)
+        stage -> explosion : addPendingWave(cell)
         note over stage, board
-          One enemy type per stage, enough to fill the stage
-          up to 10 living enemies (none if there are already 10,
-          so a door hit twice in one chain spawns only one wave).
-          The door survives and stays usable;
+          The wave appears at this cell (the door, or where the
+          power-up was) only once this explosion goes out (see the
+          end of the diagram). The door survives and stays usable;
           a power-up is destroyed.
         end note
     end
@@ -170,11 +170,9 @@ loop while explosionQueue is not empty
 end
 
 note over stage, explosion
-  Each explosion and each crumbling block lasts about half a
-  second; the stage counts them down every tick, then removes
-  the explosion and lets the block disappear.
-  Only flameCells linger: anything walking into them meanwhile
-  is hit as part of "Move Bomberman" and "Move Enemies".
+  Only flameCells linger: anything walking into them
+  meanwhile is hit as part of "Move Bomberman" and
+  "Move Enemies".
 end note
 
 stage --> game
@@ -184,5 +182,30 @@ bridge --> view
 view -> bridge : getState()
 bridge --> view : tiles, entities and events
 view -> view : draw canvas, play sounds
+
+... about half a second later (each tick starts as above) ...
+
+game -> stage : update(input)
+stage -> board : tick()
+note right of board
+  Crumbling blocks finish and disappear,
+  exposing their hidden power-up or door.
+end note
+stage -> explosion : tick()
+explosion --> stage : expired
+opt expired
+    stage -> stage : explosions.remove(explosion)
+    loop for each pending wave cell of this explosion
+        stage -> factory : createWave(stageData.waveType(), cell, 10 - livingEnemyCount())
+        factory --> stage : newEnemies
+        stage -> stage : enemies.addAll(newEnemies)
+    end
+    note over stage, factory
+      One enemy type per stage, enough to fill the stage up to
+      10 living enemies (none if there are already 10, so a door
+      hit by two explosions of one chain spawns only one wave).
+      The flame is already gone, so the new enemies survive it.
+    end note
+end
 
 @enduml

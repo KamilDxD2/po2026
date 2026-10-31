@@ -26,9 +26,11 @@ skinparam ArrowFontSize 11
 actor "Player" as player
 actor "Time" as time
 
-rectangle "Bomberman (NES 1985)" {
+rectangle "Bomberman (NES 1985 rules)" {
 
     ' Column 1: player goals
+    ' 2 extra lives, 1 bomb, fire range 1, stage 1 with a random
+    ' layout; the start area is always free.
     usecase "Start New Game" as UC_Start
     usecase "Load Saved Game" as UC_Load
     ' Done from the pause menu; replaces the NES password system.
@@ -38,23 +40,29 @@ rectangle "Bomberman (NES 1985)" {
     ' Bombs block unless Bomb Pass; a bomb you just placed under
     ' yourself can still be walked off, but not back onto.
     usecase "Move Bomberman" as UC_Move
-    ' Not possible inside a soft block (Wall Pass), on a cell that
-    ' already has a bomb, or when the bomb limit is reached.
+    ' Not possible inside a soft block (Wall Pass), on the door, on a
+    ' power-up, on a cell that already has a bomb, or when the bomb
+    ' limit is reached.
+    ' The bomb snaps to the cell under Bomberman's center.
     usecase "Place Bomb" as UC_PlaceBomb
     ' Needs the Detonator power-up; sets off the oldest bomb.
     ' With the Detonator, bombs have no fuse and wait for this.
     usecase "Detonate Bomb Remotely" as UC_Remote
 
     ' Column 2: consequences
+    ' Happens once Bomberman has entered the whole cell.
     usecase "Pick Up Power-up" as UC_PickUp
-    ' Leads to the next stage; after stage 50 the game is won.
+    ' Happens once Bomberman has entered the whole door cell.
+    ' Gives 1 extra life and leads to the next stage; after stage 50
+    ' the game is won.
     usecase "Exit Stage" as UC_Exit
-    ' Restarts the stage. All power-ups except Bombs, Flames and
-    ' Speed are lost.
+    ' Restarts the stage with a new random layout. All power-ups
+    ' except Bombs, Flames and Speed are lost.
     usecase "Lose Life" as UC_LoseLife
-    ' One enemy type per stage, filling the stage up to 10 enemies.
-    ' Bombing an exposed door or power-up spawns a wave; the power-up
-    ' is destroyed, the door survives.
+    ' Bombed door or power-up: once the flame goes out, the stage's
+    ' wave type appears at that cell, filling the stage up to 10
+    ' enemies; the power-up is destroyed, the door survives.
+    ' Stage time out: all enemies are replaced by 10 Pontans.
     usecase "Spawn Enemy Wave" as UC_Spawn
 
     ' Column 3: end of game and events driven by time
@@ -69,7 +77,8 @@ rectangle "Bomberman (NES 1985)" {
     ' bombs it reaches (chain reaction). The flame stops at a bomb, but
     ' passes exposed power-ups and the door.
     usecase "Explode Bomb" as UC_Explode
-    ' After 200 seconds, all enemies are replaced by 10 Pontans.
+    ' After 200 game seconds (about 1.55 real seconds each), all
+    ' enemies are replaced by 10 Pontans.
     ' Play continues; the stage still needs every enemy dead.
     usecase "Run Out of Stage Time" as UC_TimeOut
 }

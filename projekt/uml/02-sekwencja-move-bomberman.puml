@@ -1,0 +1,210 @@
+@startuml
+title Move Bomberman
+
+hide footbox
+
+legend top right
+  |<#E6E6E6> View (React / TypeScript) |
+  |<#CFE3F7> Controller (Java) |
+  |<#D8F0D8> Model (Java) |
+endlegend
+autonumber
+
+skinparam ParticipantBackgroundColor LightCyan
+skinparam ParticipantBorderColor DarkSlateGray
+skinparam ActorBackgroundColor White
+skinparam ActorBorderColor DarkSlateGray
+skinparam ArrowColor SlateGray
+skinparam SequenceLifeLineBorderColor SlateGray
+skinparam SequenceGroupBorderColor DarkSlateGray
+skinparam DefaultFontName Arial
+skinparam note {
+    BackgroundColor LightYellow
+    BorderColor Orange
+}
+
+' ==========================================
+' Participants, coloured by MVC layer as in "Explode Bomb" (see legend).
+' Stage implements the Arena interface (isPassable), so Player and
+' Enemy can ask where they may walk without depending on Stage.
+' ==========================================
+actor "Player" as user
+actor "Time" as time
+
+participant "GameLoop" as view #E6E6E6
+
+participant "GameBridge" as bridge #CFE3F7
+
+participant "game : Game" as game #D8F0D8
+participant "stage : Stage" as stage #D8F0D8
+participant "player : Player" as player #D8F0D8
+participant "enemy : Enemy" as enemy #D8F0D8
+participant "explosion : Explosion" as explosion #D8F0D8
+participant "board : Board" as board #D8F0D8
+participant "powerUp : PowerUp" as powerUp #D8F0D8
+
+' ==========================================
+' Input reaches the model on the next frame
+' ==========================================
+user -> view : hold arrow key
+view -> view : inputMask |= key (cleared on release)
+time -> view : next animation frame
+view -> bridge : tick(inputMask)
+bridge -> game : update(input)
+note right of game : Returns at once while paused.
+game -> stage : update(input)
+
+note over stage, board
+  Everything below runs within one tick (1/60 s).
+  Order of stage.update(): 1. the player (this diagram),
+  2. bombs ("Explode Bomb"), 3. enemies ("Move Enemies").
+end note
+
+' ==========================================
+' 1. Movement (only while a direction is held)
+' ==========================================
+opt player alive and a direction key is held
+    stage -> player : move(input.direction(), this)
+    note right of stage
+      If two directions are held,
+      the newer one wins.
+    end note
+
+    player -> player : step = pixels for this tick
+    note right of player
+      1 px every 1.33 ticks; 1 px per tick
+      with Speed. A sub-pixel counter
+      carries the remainder.
+    end note
+
+    player -> player : ahead = next cell in direction,\nfrom the nearest lane
+    player -> stage : isPassable(ahead, player)
+    note left of stage : Called through the Arena\ninterface, implemented by Stage.
+    stage -> board : tileAt(ahead)
+    board --> stage : tile
+
+    alt hard block
+        stage --> player : false
+    else soft or crumbling block
+        stage -> player : passesSoftBlocks()
+        player --> stage : hasWallPass
+        stage --> player : hasWallPass
+    else bomb on the cell
+        stage -> player : passesBombs()
+        player --> stage : hasBombPass
+        stage --> player : hasBombPass or player still overlaps that bomb
+        note right of stage
+          A bomb you just placed under yourself does
+          not block you until you have fully left it.
+        end note
+    else free cell (an exposed power-up or the door is free too)
+        stage --> player : true
+    end
+
+    alt passable and aligned with the lane
+        player -> player : position += step in direction
+    else passable but a few pixels off the lane
+        player -> player : position += step toward the lane center
+        note right of player
+          Corner assist: slides into the corridor
+          instead of catching on a block's corner.
+        end note
+    else not passable
+        player -> player : move only up to the edge of the current cell
+    end
+    player --> stage
+end
+
+' ==========================================
+' 2. Deadly contact, checked first so that a player who dies
+'    this tick can neither pick anything up nor exit. Also
+'    catches enemies that walked into a standing player
+'    ("Move Enemies" refers here; enemies move later in the
+'    tick, so such a touch is caught on the next tick, 1/60 s
+'    later). "cell" = the cell under the player's center.
+' ==========================================
+stage -> player : centerCell()
+player --> stage : cell
+
+stage -> player : isInvincible()
+player --> stage : invincible
+note right of player : Mystery: 34 s,\ncounted down every tick.
+
+opt player alive and not invincible
+    loop for each living enemy
+        stage -> enemy : hitbox()
+        enemy --> stage : box
+        opt player still alive and player's hitbox overlaps box
+            stage -> player : die()
+        end
+    end
+
+    stage -> player : isFireProof()
+    player --> stage : fireProof
+    opt player still alive and not fireProof
+        loop for each explosion
+            stage -> explosion : burns(cell)
+            explosion --> stage : burning
+            opt burning and player still alive
+                stage -> player : die()
+            end
+        end
+        note over stage, player
+          Only flameCells linger; a destroyed block
+          kills only at the moment of the blast.
+        end note
+    end
+end
+
+opt the player died in the checks above
+    stage -> game : onPlayerHit()
+    ref over game, player : Lose Life (continues after the death animation)
+end
+
+' ==========================================
+' 3. What is on the player's cell (every tick, even when
+'    standing still), only for a living player
+' ==========================================
+opt player alive and exposed power-up on cell
+    stage -> player : isFullyInside(cell)
+    player --> stage : inside
+    opt inside
+        stage -> board : takeItem(cell)
+        board --> stage : powerUp
+        stage -> powerUp : applyTo(player)
+        powerUp -> player : its upgrade method, e.g. increaseFireRange()\nor grantWallPass()
+        note over player, board
+          Each power-up type is its own PowerUp subclass:
+          Bomb, Fire, Speed, Wall Pass, Bomb Pass, Flame Pass,
+          Detonator, Mystery. The stage does not need to know
+          which one it picked up (polymorphism). Each type
+          also enforces its own maximum.
+        end note
+    end
+    note right of stage
+      Like the door, a power-up works
+      only once the player has entered
+      the whole cell.
+    end note
+end
+
+opt player alive and exposed door on cell and livingEnemyCount() == 0
+    stage -> player : isFullyInside(cell)
+    player --> stage : inside
+    opt inside
+        stage -> game : onStageCleared()
+        note right of game
+          Exit Stage: Game switches stages after this tick
+          and adds 1 life; power-ups carry over. After stage
+          50 the game is won; otherwise the next stage is set
+          up as in "Start New Game".
+        end note
+    end
+end
+
+stage --> game
+game --> bridge
+bridge --> view
+note over view, bridge : The frame is then drawn as in\n"Explode Bomb" (getState, draw, sounds).
+
+@enduml
