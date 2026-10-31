@@ -1,0 +1,136 @@
+@startuml
+title Start New Game
+
+hide footbox
+
+legend top right
+  |<#E6E6E6> View (React / TypeScript) |
+  |<#CFE3F7> Controller (Java) |
+  |<#D8F0D8> Model (Java) |
+endlegend
+autonumber
+
+skinparam ParticipantBackgroundColor LightCyan
+skinparam ParticipantBorderColor DarkSlateGray
+skinparam ActorBackgroundColor White
+skinparam ActorBorderColor DarkSlateGray
+skinparam ArrowColor SlateGray
+skinparam SequenceLifeLineBorderColor SlateGray
+skinparam SequenceGroupBorderColor DarkSlateGray
+skinparam DefaultFontName Arial
+skinparam note {
+    BackgroundColor LightYellow
+    BorderColor Orange
+}
+
+' ==========================================
+' Participants, coloured by MVC layer as in "Explode Bomb" (see legend).
+' The "Set Up Stage" group is reused by "Lose Life" (restart with a
+' new random layout), "Exit Stage" (next stage) and "Load Saved Game".
+' ==========================================
+actor "Player" as user
+
+participant "GameLoop" as view #E6E6E6
+
+participant "GameBridge" as bridge #CFE3F7
+
+participant "stageTable : StageTable" as table #D8F0D8
+participant "game : Game" as game #D8F0D8
+participant "player : Player" as player #D8F0D8
+participant "StageFactory" as sfactory #D8F0D8
+participant "board : Board" as board #D8F0D8
+participant "EnemyFactory" as efactory #D8F0D8
+participant "stage : Stage" as stage #D8F0D8
+
+' ==========================================
+' Once, when the app starts: load the 50-stage table (I/O)
+' ==========================================
+view -> view : fetch("stages.csv")
+view -> bridge : loadStages(text)
+create table
+bridge -> table : StageTable.parse(text)
+note right of table
+  Reads one line per stage with a BufferedReader (java.io):
+  enemy types and counts, hidden power-up type and the
+  wave enemy type. Soft blocks: 54 on stage 1, plus 2 for
+  each later stage (152 on stage 50).
+end note
+bridge --> view
+
+... later, in the main menu ...
+
+' ==========================================
+' The player starts a new game
+' ==========================================
+user -> view : click "Start New Game"
+view -> bridge : startNewGame()
+
+create game
+bridge -> game : new Game(stageTable)
+game -> game : lives = 2, score = 0, stageNumber = 1
+note right of game : 2 extra lives, as shown\non screen; +1 per cleared stage.
+
+create player
+game -> player : new Player()
+note right of player : 1 bomb, fire range 1,\nno other power-ups.
+
+group Set Up Stage (also used by "Lose Life", "Exit Stage" and "Load Saved Game")
+    game -> table : get(stageNumber)
+    table --> game : stageData
+
+    game -> sfactory : create(stageData, player, this, random)
+    note right of game
+      this = Game as StageListener.
+      random = java.util.Random; JUnit tests
+      pass a fixed seed to get the same layout.
+    end note
+
+    create board
+    sfactory -> board : new Board(31, 13)
+    note right of board
+      29 x 11 playable cells inside a one-cell
+      indestructible border. Hard blocks sit on every
+      cell whose column and row are both even; every
+      other cell starts free. The start cell is (1, 1).
+    end note
+
+    sfactory -> sfactory : startArea = top-left cell\n+ the cells right of and below it
+    note right of sfactory
+      The start area stays free, so the first bomb
+      can always be placed and escaped.
+    end note
+
+    loop stageData.softBlockCount() times
+        sfactory -> board : placeSoftBlock(random free cell outside startArea)
+    end
+
+    sfactory -> board : hideDoor(random soft block)
+    sfactory -> board : hidePowerUp(another random soft block,\nPowerUp.of(stageData.powerUpType()))
+    note right of board : PowerUp.of(type) creates\nthe matching subclass.
+
+    loop for each enemy listed in stageData
+        sfactory -> efactory : create(type, random free cell away from startArea)
+        efactory --> sfactory : enemy
+    end
+
+    create stage
+    sfactory -> stage : new Stage(stageData, board, enemies, player, listener)
+    stage -> player : respawnAt(start cell)
+    note right of stage
+      respawnAt puts the player on the start cell
+      and makes them alive again (after a death).
+      The timer starts at 200 game seconds
+      (about 1.55 real seconds each).
+    end note
+    sfactory --> game : stage
+end
+
+game --> bridge
+bridge --> view
+view -> view : switch from menu to game screen
+note right of view
+  From now on every frame calls
+  tick(inputMask), as in "Move Bomberman".
+end note
+
+@enduml
