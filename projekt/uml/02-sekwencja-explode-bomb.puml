@@ -1,0 +1,188 @@
+@startuml
+title Explode Bomb
+
+hide footbox
+autonumber
+
+skinparam ParticipantBackgroundColor LightCyan
+skinparam ParticipantBorderColor DarkSlateGray
+skinparam ActorBackgroundColor White
+skinparam ActorBorderColor DarkSlateGray
+skinparam ArrowColor SlateGray
+skinparam SequenceLifeLineBorderColor SlateGray
+skinparam SequenceGroupBorderColor DarkSlateGray
+skinparam SequenceBoxBorderColor DarkSlateGray
+skinparam DefaultFontName Arial
+skinparam note {
+    BackgroundColor LightYellow
+    BorderColor Orange
+}
+
+' ==========================================
+' Participants, grouped by MVC layer.
+' Board  = static terrain: hard/soft blocks, hidden items, the door.
+' Stage  = everything that moves or changes: player, enemies,
+'          bombs, explosions.
+' ==========================================
+actor "Time" as time
+
+box "View (React / TypeScript)" #WhiteSmoke
+    participant "GameLoop" as view
+end box
+
+box "Controller (Java)" #AliceBlue
+    participant "GameBridge" as bridge
+end box
+
+box "Model (Java)" #Honeydew
+    participant "game : Game" as game
+    participant "stage : Stage" as stage
+    participant "bomb : Bomb" as bomb
+    participant "explosion : Explosion" as explosion
+    participant "board : Board" as board
+    participant "enemy : Enemy" as enemy
+    participant "player : Player" as player
+    participant "EnemyFactory" as factory
+end box
+
+' ==========================================
+' One frame in which at least one fuse runs out
+' ==========================================
+time -> view : next animation frame
+view -> bridge : tick(inputMask)
+bridge -> game : update(input)
+game -> stage : update(input)
+
+note over game, board
+  Everything from here until the frame is drawn
+  runs within one tick (1/60 s), so the player sees
+  the whole explosion appear at once.
+end note
+
+loop for each bomb on the stage
+    stage -> bomb : tick()
+    bomb --> stage : fuseExpired
+    opt fuseExpired
+        stage -> stage : explosionQueue.add(bomb)
+    end
+end
+note right of bomb
+  Bombs placed while the player has the
+  Detonator have no fuse: they explode only
+  through "Detonate Bomb Remotely" (which adds
+  the oldest bomb to the same queue and continues
+  from here) or through a chain reaction.
+end note
+
+loop while explosionQueue is not empty
+    stage -> stage : next = explosionQueue.poll()
+    stage -> stage : bombs.remove(next)
+
+    create explosion
+    stage -> explosion : new Explosion(position, fireRange)
+    stage -> explosion : spread(board, bombs)
+    explosion -> explosion : flameCells.add(position)
+    note right of explosion : The bomb's own cell\nburns too.
+
+    loop for each of 4 directions, up to fireRange cells
+        explosion -> board : tileAt(cell)
+        board --> explosion : tile
+        alt hard block or crumbling block
+            explosion -> explosion : stop this direction
+        else another bomb on the cell
+            explosion -> explosion : hitBombs.add(otherBomb)
+            explosion -> explosion : stop this direction
+            note right of explosion
+              The flame does not pass a bomb;
+              it sets it off instead (chain reaction).
+            end note
+        else soft block
+            explosion -> board : crumble(cell)
+            explosion -> explosion : brokenBlocks.add(cell)
+            explosion -> explosion : stop this direction
+            note right of board
+              A crumbling block still stops flames.
+              After about half a second it disappears
+              and exposes its hidden power-up or door,
+              so the blast that revealed an item never
+              destroys it. Anything inside the block
+              (Wall Pass) dies now.
+            end note
+        else free cell
+            explosion -> explosion : flameCells.add(cell)
+            note right of explosion
+              Exposed power-ups, the door and
+              flames of other explosions do not
+              stop the flame; flames may overlap.
+            end note
+        end
+    end
+    explosion --> stage : hitCells (flameCells + brokenBlocks), hitBombs
+    stage -> stage : explosions.add(explosion)
+
+    loop for each living enemy in hitCells
+        stage -> enemy : kill()
+        enemy --> stage : basePoints
+        stage -> explosion : scoreKill(basePoints)
+        explosion --> stage : points
+        stage -> game : onEnemyKilled(points)
+        note right of game : Game implements StageListener\nand adds the points to the score
+    end
+    note over stage, explosion
+      Each further kill by the same explosion moves one step up
+      the table 100, 200, 400, 800, 1000, 2000, 4000, 8000 (capped
+      at 10000), starting at the enemy's own value.
+      Example: two Minvos give 800 + 1000.
+    end note
+
+    loop for each otherBomb in hitBombs (chain reaction)
+        opt otherBomb not yet queued
+            stage -> stage : explosionQueue.add(otherBomb)
+        end
+    end
+
+    loop for each exposed power-up or door in flameCells
+        opt power-up
+            stage -> board : removeItem(cell)
+        end
+        stage -> factory : createWave(stageNumber, cell, 10 - livingEnemyCount())
+        factory --> stage : newEnemies
+        stage -> stage : enemies.addAll(newEnemies)
+        note over stage, board
+          One enemy type per stage, enough to fill the stage
+          up to 10 living enemies (none if there are already 10,
+          so a door hit twice in one chain spawns only one wave).
+          The door survives and stays usable;
+          a power-up is destroyed.
+        end note
+    end
+
+    opt player alive and in hitCells
+        stage -> player : isFireProof()
+        player --> stage : fireProof
+        note right of player : true with Flame Pass\nor Mystery invincibility
+        opt not fireProof
+            stage -> player : die()
+            stage -> game : onPlayerHit()
+            ref over game, player : Lose Life (continues after the death animation)
+        end
+    end
+end
+
+note over stage, explosion
+  Each explosion and each crumbling block lasts about half a
+  second; the stage counts them down every tick, then removes
+  the explosion and lets the block disappear.
+  Only flameCells linger: anything walking into them meanwhile
+  is hit as part of "Move Bomberman" and "Move Enemies".
+end note
+
+stage --> game
+game --> bridge
+bridge --> view
+
+view -> bridge : getState()
+bridge --> view : tiles, entities and events
+view -> view : draw canvas, play sounds
+
+@enduml

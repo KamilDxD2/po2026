@@ -34,34 +34,48 @@ rectangle "Bomberman (NES 1985)" {
     ' Done from the pause menu; replaces the NES password system.
     usecase "Save Game" as UC_Save
     usecase "Pause / Resume" as UC_Pause
+    ' Hard blocks always block. Soft blocks block unless Wall Pass.
+    ' Bombs block unless Bomb Pass; a bomb you just placed under
+    ' yourself can still be walked off, but not back onto.
     usecase "Move Bomberman" as UC_Move
+    ' Not possible inside a soft block (Wall Pass), on a cell that
+    ' already has a bomb, or when the bomb limit is reached.
     usecase "Place Bomb" as UC_PlaceBomb
     ' Needs the Detonator power-up; sets off the oldest bomb.
+    ' With the Detonator, bombs have no fuse and wait for this.
     usecase "Detonate Bomb Remotely" as UC_Remote
 
     ' Column 2: consequences
     usecase "Pick Up Power-up" as UC_PickUp
     ' Leads to the next stage; after stage 50 the game is won.
     usecase "Exit Stage" as UC_Exit
-    ' Restarts the stage. All power-ups except Bombs and Flames are lost.
+    ' Restarts the stage. All power-ups except Bombs, Flames and
+    ' Speed are lost.
     usecase "Lose Life" as UC_LoseLife
-    ' Bombing an exposed power-up only destroys it (project decision,
-    ' unlike the NES original, where it also spawns enemies).
+    ' One enemy type per stage, filling the stage up to 10 enemies.
+    ' Bombing an exposed door or power-up spawns a wave; the power-up
+    ' is destroyed, the door survives.
     usecase "Spawn Enemy Wave" as UC_Spawn
 
     ' Column 3: end of game and events driven by time
     usecase "End Game" as UC_EndGame
+    ' Each enemy type has its own speed and movement pattern.
+    ' Enemies turn around when they reach a bomb.
     usecase "Move Enemies" as UC_MoveEnemies
     ' Blast spreads in 4 directions up to the fire range: destroys soft
-    ' blocks (revealing a hidden power-up or the door), kills enemies
-    ' (adds score) and detonates other bombs it reaches (chain reaction).
+    ' blocks (revealing a hidden power-up or the door once they finish
+    ' crumbling, and killing anything inside them), kills enemies (each
+    ' further kill by the same blast scores more) and detonates other
+    ' bombs it reaches (chain reaction). The flame stops at a bomb, but
+    ' passes exposed power-ups and the door.
     usecase "Explode Bomb" as UC_Explode
-    ' After 200 seconds, Pontans flood the stage.
+    ' After 200 seconds, all enemies are replaced by 10 Pontans.
+    ' Play continues; the stage still needs every enemy dead.
     usecase "Run Out of Stage Time" as UC_TimeOut
 }
 
 ' ==========================================
-' ACTOR ASSOCIATIONS
+' ACTOR ASSOCIATIONS (plain lines, as in UML)
 ' ==========================================
 player -- UC_Start
 player -- UC_Load
@@ -81,12 +95,12 @@ UC_TimeOut -- time
 ' ==========================================
 UC_Move <.. UC_PickUp : <<extend>>\n[power-up on tile]
 UC_Move <.. UC_Exit : <<extend>>\n[door on tile, no enemies left]
-UC_Move <.. UC_LoseLife : <<extend>>\n[walks into enemy,\nnot invincible]
+UC_Move <.. UC_LoseLife : <<extend>>\n[walks into enemy or flame,\nnot protected]
 
 UC_LoseLife <.. UC_EndGame : <<extend>>\n[no lives left]
 UC_LoseLife ..> UC_MoveEnemies : <<extend>>\n[enemy reaches player,\nnot invincible]
 UC_LoseLife ..> UC_Explode : <<extend>>\n[player in blast, no Flame Pass,\nnot invincible]
-UC_Spawn ..> UC_Explode : <<extend>>\n[blast hits exposed door]
+UC_Spawn ..> UC_Explode : <<extend>>\n[blast hits exposed\ndoor or power-up]
 
 ' ==========================================
 ' INCLUDE: the base use case always performs the included one.
