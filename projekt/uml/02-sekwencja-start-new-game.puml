@@ -26,7 +26,7 @@ skinparam note {
 ' ==========================================
 ' Participants, coloured by MVC layer as in "Explode Bomb" (see legend).
 ' The "Set Up Stage" group is reused by "Lose Life" (restart with a
-' new random layout), "Exit Stage" (next stage) and "Load Saved Game".
+' new random layout) and "Exit Stage" (next stage).
 ' ==========================================
 actor "Player" as user
 
@@ -34,6 +34,7 @@ participant "GameLoop" as view #E6E6E6
 
 participant "GameBridge" as bridge #CFE3F7
 
+participant "highScore : HighScore" as high #D8F0D8
 participant "stageTable : StageTable" as table #D8F0D8
 participant "game : Game" as game #D8F0D8
 participant "player : Player" as player #D8F0D8
@@ -56,8 +57,23 @@ note right of table
   each later stage (152 on stage 50).
 end note
 bridge --> view
+view -> view : read "topScore" from localStorage\n(empty on the very first start)
+view -> bridge : loadTopScore(bytes)
+create high
+bridge -> high : HighScore.readFrom(bytes)
+note right of high
+  Saveable, like Save Game: the top score survives
+  closing the browser. No bytes yet: top score 0.
+end note
+bridge --> view
 
 ... later, in the main menu ...
+
+view -> bridge : getTopScore()
+bridge -> high : best()
+high --> bridge : topScore
+bridge --> view : topScore
+view -> view : show main menu with the top score
 
 ' ==========================================
 ' The player starts a new game
@@ -66,7 +82,7 @@ user -> view : click "Start New Game"
 view -> bridge : startNewGame()
 
 create game
-bridge -> game : new Game(stageTable)
+bridge -> game : new Game(stageTable, highScore)
 game -> game : lives = 2, score = 0, stageNumber = 1
 note right of game : 2 extra lives, as shown\non screen; +1 per cleared stage.
 
@@ -74,7 +90,7 @@ create player
 game -> player : new Player()
 note right of player : 1 bomb, fire range 1,\nno other power-ups.
 
-group Set Up Stage (also used by "Lose Life", "Exit Stage" and "Load Saved Game")
+group Set Up Stage (also used by "Lose Life" and "Exit Stage")
     game -> table : get(stageNumber)
     table --> game : stageData
 
@@ -123,11 +139,18 @@ group Set Up Stage (also used by "Lose Life", "Exit Stage" and "Load Saved Game"
       (about 1.55 real seconds each).
     end note
     sfactory --> game : stage
+    game -> game : state = STAGE_INTRO,\nintroTimer = about 3 s
+    note right of game
+      The view shows a black screen with "STAGE n".
+      While it shows, update() only counts introTimer
+      down: the stage does not run and its timer does
+      not count. Then state = PLAYING.
+    end note
 end
 
 game --> bridge
 bridge --> view
-view -> view : switch from menu to game screen
+view -> view : switch from the menu to the game\n(starting with the "STAGE 1" screen)
 note right of view
   From now on every frame calls
   tick(inputMask), as in "Move Bomberman".

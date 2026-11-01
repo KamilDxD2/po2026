@@ -51,7 +51,11 @@ view -> view : inputMask |= key (cleared on release)
 time -> view : next animation frame
 view -> bridge : tick(inputMask)
 bridge -> game : update(input)
-note right of game : Returns at once while paused.
+note right of game
+  Updates the stage only while PLAYING or DYING:
+  not while PAUSED, on the "STAGE n" screen
+  (STAGE_INTRO) or after GAME_OVER / WON.
+end note
 game -> stage : update(input)
 
 note over stage, board
@@ -188,16 +192,25 @@ opt player alive and exposed power-up on cell
     end note
 end
 
-opt player alive and exposed door on cell and livingEnemyCount() == 0
+opt player alive and exposed door on cell and noEnemiesLeft()
+    note left of stage
+      noEnemiesLeft(): no living
+      enemies and no waves still
+      pending, so a bombed door
+      can never be escaped.
+    end note
     stage -> player : isFullyInside(cell)
     player --> stage : inside
     opt inside
         stage -> game : onStageCleared()
         note right of game
           Exit Stage: Game switches stages after this tick
-          and adds 1 life; power-ups carry over. After stage
-          50 the game is won; otherwise the next stage is set
-          up as in "Start New Game".
+          and adds 1 life; power-ups carry over. The next
+          stage is set up as in "Start New Game", "STAGE n"
+          screen first. After stage 50: state = WON, the score
+          goes to HighScore, the view shows a "you won" screen
+          with the final score, and a key press returns to
+          the main menu.
         end note
     end
 end

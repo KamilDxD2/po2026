@@ -1,0 +1,121 @@
+@startuml
+title Lose Life
+
+hide footbox
+
+legend top right
+  |<#E6E6E6> View (React / TypeScript) |
+  |<#CFE3F7> Controller (Java) |
+  |<#D8F0D8> Model (Java) |
+endlegend
+autonumber
+
+skinparam ParticipantBackgroundColor LightCyan
+skinparam ParticipantBorderColor DarkSlateGray
+skinparam ActorBackgroundColor White
+skinparam ActorBorderColor DarkSlateGray
+skinparam ArrowColor SlateGray
+skinparam SequenceLifeLineBorderColor SlateGray
+skinparam SequenceGroupBorderColor DarkSlateGray
+skinparam DefaultFontName Arial
+skinparam note {
+    BackgroundColor LightYellow
+    BorderColor Orange
+}
+
+' ==========================================
+' Participants, coloured by MVC layer as in "Explode Bomb" (see legend).
+' Starts where "Move Bomberman" and "Explode Bomb" end: the stage has
+' just called player.die() and reports it to the game. Includes the
+' extension "End Game" (no lives left).
+' ==========================================
+actor "Time" as time
+
+participant "GameLoop" as view #E6E6E6
+
+participant "GameBridge" as bridge #CFE3F7
+
+participant "game : Game" as game #D8F0D8
+participant "stage : Stage" as stage #D8F0D8
+participant "player : Player" as player #D8F0D8
+participant "highScore : HighScore" as high #D8F0D8
+
+' ==========================================
+' 1. The death is reported (within the tick in which it happens)
+' ==========================================
+stage -> game : onPlayerHit()
+game -> game : state = DYING,\ndeathTimer = about 3 s
+note right of game
+  The stage keeps running while the death animation
+  plays: enemies move and bombs explode, but the dead
+  player cannot move, be hit again, pick anything up
+  or exit (the "player alive" checks). The pause menu
+  is not available while DYING.
+end note
+game --> stage
+
+... while the death animation plays ...
+
+' ==========================================
+' 2. Every later tick counts the animation down
+' ==========================================
+time -> view : next animation frame
+view -> bridge : tick(inputMask)
+bridge -> game : update(input)
+game -> stage : update(input)
+note right of stage : Runs as usual; the dead\nplayer is skipped.
+stage --> game
+game -> game : deathTimer--
+
+opt deathTimer reached 0
+    alt lives == 0
+        game -> game : state = GAME_OVER
+        game -> high : submit(score)
+        note right of game
+          End Game: no lives left. From now on
+          update() returns at once (as when paused).
+          HighScore keeps the score if it beats
+          the top score shown in the main menu.
+        end note
+    else lives > 0
+        game -> game : lives--
+        game -> player : loseTemporaryPowerUps()
+        note right of player
+          Keeps Bombs, Fire and Speed. Loses Wall Pass,
+          Bomb Pass, Flame Pass, Detonator and Mystery.
+          The score is kept.
+        end note
+        ref over game, player
+          Set Up Stage (see "Start New Game"): same stage
+          number, new random layout, timer back to 200,
+          "STAGE n" screen for about 3 s. The old stage is
+          dropped with its bombs, explosions and pending waves.
+        end ref
+    end
+end
+
+game --> bridge
+bridge --> view
+
+' ==========================================
+' 3. The view shows the result
+' ==========================================
+view -> bridge : getState()
+bridge --> view : tiles, entities, events and game state
+alt game state has just become GAME_OVER
+    view -> view : show "GAME OVER" with the final score
+    view -> bridge : exportTopScore()
+    bridge -> high : writeTo(out)
+    high --> bridge
+    bridge --> view : bytes
+    view -> view : store bytes as "topScore"\nin localStorage
+    note right of view
+      Done once. Winning and "Quit to Main
+      Menu" store the top score the same way.
+      A key press then returns to the main menu.
+    end note
+else
+    view -> view : draw canvas, play sounds
+end
+
+@enduml
