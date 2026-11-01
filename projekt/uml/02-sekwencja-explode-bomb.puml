@@ -58,14 +58,14 @@ note over game, board
   Everything from here until the frame is drawn runs within
   one tick (1/60 s), so the player sees the whole explosion
   appear at once. Order of stage.update(): 1. the player
-  ("Move Bomberman"), 2. bombs (this diagram), 3. enemies
-  ("Move Enemies").
+  ("Move Bomberman", "Place Bomb"), 2. bombs (this diagram),
+  3. enemies ("Move Enemies").
 end note
 
 loop for each bomb on the stage
     stage -> bomb : tick()
     bomb --> stage : fuseExpired
-    opt fuseExpired
+    opt fuseExpired and bomb not yet queued
         stage -> stage : explosionQueue.add(bomb)
     end
 end
@@ -74,7 +74,11 @@ note right of bomb
   Detonator have no fuse: they explode only
   through "Detonate Bomb Remotely" (which adds
   the oldest bomb to the same queue and continues
-  from here) or through a chain reaction.
+  from here) or through a chain reaction. A bomb
+  placed into a lingering flame is queued the
+  same way ("Place Bomb"). Every way into the
+  queue checks "not yet queued", so a bomb can
+  never explode twice.
 end note
 
 loop while explosionQueue is not empty
@@ -124,7 +128,7 @@ loop while explosionQueue is not empty
     stage -> stage : explosions.add(explosion)
 
     loop for each living enemy in hitCells
-        stage -> enemy : kill()
+        stage -> enemy : die()
         enemy --> stage : basePoints
         stage -> explosion : scoreKill(basePoints)
         explosion --> stage : points

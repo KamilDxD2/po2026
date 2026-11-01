@@ -1,0 +1,190 @@
+@startuml
+title Move Enemies
+
+hide footbox
+
+legend top right
+  |<#E6E6E6> View (React / TypeScript) |
+  |<#CFE3F7> Controller (Java) |
+  |<#D8F0D8> Model (Java) |
+endlegend
+autonumber
+
+skinparam ParticipantBackgroundColor LightCyan
+skinparam ParticipantBorderColor DarkSlateGray
+skinparam ActorBackgroundColor White
+skinparam ActorBorderColor DarkSlateGray
+skinparam ArrowColor SlateGray
+skinparam SequenceLifeLineBorderColor SlateGray
+skinparam SequenceGroupBorderColor DarkSlateGray
+skinparam DefaultFontName Arial
+skinparam note {
+    BackgroundColor LightYellow
+    BorderColor Orange
+}
+
+' ==========================================
+' Participants, coloured by MVC layer as in "Explode Bomb" (see legend).
+' Player and Enemy both extend the abstract class Creature (pixel
+' position, sub-pixel counter, hitbox, centerCell(), isFullyInside(),
+' isAlive(), die()). An enemy's die() also returns its base points.
+' Each Enemy has an EnemyType (speed, direction-timer range, points,
+' wall pass) and a MovementStrategy (Strategy pattern):
+'   RandomWalk     - Ballom
+'   AxisChaser     - Onil (column), Dall (row), Minvo and Kondoria (both)
+'   Alternating    - Ovapi
+'   JunctionWalker - Parse
+'   Pursuer        - Pontan
+' Speed tiers, in px per tick (Bomberman: 0.75): slowest 0.375
+' (Kondoria), slow 0.5 (Ballom, Ovapi), medium 0.75 (Onil, Dall),
+' fast 1.0 (Minvo, Parse, Pontan). Constants, to be tuned by eye.
+' ==========================================
+actor "Time" as time
+
+participant "GameLoop" as view #E6E6E6
+
+participant "GameBridge" as bridge #CFE3F7
+
+participant "game : Game" as game #D8F0D8
+participant "stage : Stage" as stage #D8F0D8
+participant "enemy : Enemy" as enemy #D8F0D8
+participant "strategy : MovementStrategy" as strategy #D8F0D8
+participant "explosion : Explosion" as explosion #D8F0D8
+
+time -> view : next animation frame
+view -> bridge : tick(inputMask)
+bridge -> game : update(input)
+game -> stage : update(input)
+
+note over stage, explosion
+  Everything below runs within one tick (1/60 s), as the third part of
+  stage.update(): 1. the player ("Move Bomberman", "Place Bomb"),
+  2. bombs ("Explode Bomb"), 3. enemies (this diagram). Enemies pass through each other,
+  so they never check one another. Touching the player is checked in
+  "Move Bomberman" on the next tick.
+end note
+
+loop for each living enemy
+    stage -> enemy : move(this)
+    note right of stage : this = Stage as Arena\n(same interface as for the player).
+
+    enemy -> enemy : step = pixels for this tick
+    note right of enemy
+      Its type's speed; the sub-pixel counter
+      carries the remainder, as for the player.
+      Types with a timer also count it down here.
+    end note
+
+    ' ==========================================
+    ' 1. Choosing a direction (only at a cell's center)
+    ' ==========================================
+    opt enemy is at the center of a cell
+        enemy -> strategy : chooseDirection(enemy, arena)
+        note right of strategy
+          MovementStrategy is an interface. The enemy does
+          not know which strategy it has; the alt below shows
+          what each implementation does.
+        end note
+
+        alt RandomWalk (Ballom)
+            opt direction timer ran out
+                strategy -> strategy : direction = random passable direction
+                strategy -> enemy : resetTimer()
+            end
+        else AxisChaser (Onil, Dall, Minvo, Kondoria)
+            strategy -> stage : lookForPlayer(enemy)
+            stage --> strategy : direction to the player, or NONE
+            alt player seen along one of its axes
+                strategy -> strategy : direction = toward the player
+                note right of strategy : Does not reset\nthe timer.
+            else direction timer ran out
+                strategy -> strategy : direction = random passable direction
+                strategy -> enemy : resetTimer()
+            end
+        else Alternating (Ovapi)
+            opt direction timer ran out
+                strategy -> stage : playerCell()
+                stage --> strategy : cell
+                strategy -> strategy : direction = toward the player, or\naway from him (alternates each time)
+                strategy -> enemy : resetTimer()
+            end
+        else JunctionWalker (Parse, no timer)
+            strategy -> stage : lookForPlayer(enemy)
+            stage --> strategy : direction to the player, or NONE
+            alt player seen
+                strategy -> strategy : direction = toward the player
+            else at a junction
+                strategy -> strategy : direction = random passable direction
+            end
+        else Pursuer (Pontan, no timer)
+            strategy -> stage : playerCell()
+            stage --> strategy : cell
+            strategy -> strategy : direction = the passable direction\nthat brings it closest to the player
+        end
+        strategy --> enemy : direction
+    end
+
+    note over stage, strategy
+      lookForPlayer: the player is alive and in the same row or column,
+      with nothing between that this enemy could not walk through
+      (hard blocks, bombs, and soft blocks unless it has wall pass).
+      An enemy sees along any line it could also walk.
+    end note
+
+    ' ==========================================
+    ' 2. Moving along the lane
+    ' ==========================================
+    enemy -> stage : isPassable(next cell in direction, enemy)
+    stage --> enemy : passable
+    note right of stage
+      Same rules as for the player (see "Move
+      Bomberman"): bombs block (except one it still
+      overlaps), soft blocks unless the type has wall
+      pass. Lingering flames do not block.
+    end note
+
+    alt passable
+        enemy -> enemy : position += step in direction
+    else blocked by a hard block, a soft block or a bomb
+        enemy -> strategy : onBlocked(enemy, arena)
+        strategy --> enemy : new direction
+        enemy -> enemy : resetTimer()
+        note right of enemy
+          At a cell's center it may take any passable
+          direction; between two cells it can only
+          turn around. Pontan and Parse simply pick
+          again by their own rule. If no direction is
+          passable at all (boxed in by bombs and blocks),
+          the enemy waits in place until one opens.
+        end note
+    end
+    enemy --> stage
+
+    ' ==========================================
+    ' 3. Walking into a lingering flame
+    ' ==========================================
+    loop for each explosion
+        stage -> explosion : burns(enemy.centerCell())
+        explosion --> stage : burning
+        opt burning and enemy still alive
+            stage -> enemy : die()
+            enemy --> stage : basePoints
+            stage -> explosion : scoreKill(basePoints)
+            explosion --> stage : points
+            stage -> game : onEnemyKilled(points)
+        end
+    end
+end
+
+note over stage, explosion
+  A killed enemy plays its death animation and is then removed
+  from the stage. It no longer counts as living, so it cannot
+  touch the player, and noEnemiesLeft() ignores it.
+end note
+
+stage --> game
+game --> bridge
+bridge --> view
+note over view, bridge : The frame is then drawn as in\n"Explode Bomb" (getState, draw, sounds).
+
+@enduml

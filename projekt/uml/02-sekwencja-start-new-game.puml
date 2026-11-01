@@ -128,6 +128,11 @@ group Set Up Stage (also used by "Lose Life" and "Exit Stage")
         sfactory -> efactory : create(type, random free cell away from startArea)
         efactory --> sfactory : enemy
     end
+    note right of efactory
+      Gives each enemy its EnemyType
+      and MovementStrategy (see
+      "Move Enemies").
+    end note
 
     create stage
     sfactory -> stage : new Stage(stageData, board, enemies, player, listener)

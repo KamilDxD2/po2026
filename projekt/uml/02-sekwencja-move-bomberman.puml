@@ -25,8 +25,10 @@ skinparam note {
 
 ' ==========================================
 ' Participants, coloured by MVC layer as in "Explode Bomb" (see legend).
-' Stage implements the Arena interface (isPassable), so Player and
-' Enemy can ask where they may walk without depending on Stage.
+' Stage implements the Arena interface (isPassable, lookForPlayer,
+' playerCell), so Player and Enemy can ask where they may walk without
+' depending on Stage. Player and Enemy both extend the abstract class
+' Creature (see "Move Enemies").
 ' ==========================================
 actor "Player" as user
 actor "Time" as time
@@ -60,8 +62,9 @@ game -> stage : update(input)
 
 note over stage, board
   Everything below runs within one tick (1/60 s).
-  Order of stage.update(): 1. the player (this diagram),
-  2. bombs ("Explode Bomb"), 3. enemies ("Move Enemies").
+  Order of stage.update(): 1. the player (this diagram;
+  "Place Bomb" runs right after the movement), 2. bombs
+  ("Explode Bomb"), 3. enemies ("Move Enemies").
 end note
 
 ' ==========================================

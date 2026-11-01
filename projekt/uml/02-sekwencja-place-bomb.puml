@@ -1,0 +1,123 @@
+@startuml
+title Place Bomb
+
+hide footbox
+
+legend top right
+  |<#E6E6E6> View (React / TypeScript) |
+  |<#CFE3F7> Controller (Java) |
+  |<#D8F0D8> Model (Java) |
+endlegend
+autonumber
+
+skinparam ParticipantBackgroundColor LightCyan
+skinparam ParticipantBorderColor DarkSlateGray
+skinparam ActorBackgroundColor White
+skinparam ActorBorderColor DarkSlateGray
+skinparam ArrowColor SlateGray
+skinparam SequenceLifeLineBorderColor SlateGray
+skinparam SequenceGroupBorderColor DarkSlateGray
+skinparam DefaultFontName Arial
+skinparam note {
+    BackgroundColor LightYellow
+    BorderColor Orange
+}
+
+' ==========================================
+' Participants, coloured by MVC layer as in "Explode Bomb" (see legend).
+' Placing a bomb is part of the player's step of stage.update(),
+' right after the movement in "Move Bomberman" and before its
+' contact checks.
+' ==========================================
+actor "Player" as user
+actor "Time" as time
+
+participant "GameLoop" as view #E6E6E6
+
+participant "GameBridge" as bridge #CFE3F7
+
+participant "game : Game" as game #D8F0D8
+participant "stage : Stage" as stage #D8F0D8
+participant "player : Player" as player #D8F0D8
+participant "board : Board" as board #D8F0D8
+participant "bomb : Bomb" as bomb #D8F0D8
+participant "explosion : Explosion" as explosion #D8F0D8
+
+user -> view : press bomb key
+view -> view : inputMask |= BOMB (cleared on release)
+time -> view : next animation frame
+view -> bridge : tick(inputMask)
+bridge -> game : update(input)
+game -> stage : update(input)
+
+note over stage, board
+  Runs within one tick, in the player's step of stage.update(),
+  after the movement in "Move Bomberman". input.bombPressed() is
+  true only in the tick the key goes down: GameBridge keeps one
+  Input object and updates it with each new mask, so it knows the
+  previous one. Holding the key places just one bomb.
+end note
+
+opt player alive and input.bombPressed()
+    stage -> player : centerCell()
+    player --> stage : cell
+    stage -> player : bombCapacity()
+    player --> stage : capacity
+    stage -> board : tileAt(cell)
+    board --> stage : tile
+    stage -> board : exposedItemAt(cell)
+    board --> stage : NONE, DOOR or POWER_UP
+
+    opt bombs.size() < capacity and tile is free\nand item is NONE and no bomb on cell
+        note right of stage
+          Otherwise nothing happens:
+          - bomb limit reached (1 at start, +1 per Bomb power-up),
+          - inside a soft or crumbling block (Wall Pass),
+          - on the door or a power-up,
+          - a bomb is already on this cell.
+        end note
+
+        stage -> player : fireRange()
+        player --> stage : range
+        stage -> player : hasDetonator()
+        player --> stage : detonator
+
+        create bomb
+        stage -> bomb : new Bomb(cell, range, detonator ? no fuse : 160 ticks)
+        note right of bomb
+          Snaps to the cell under the player's center.
+          Fire range is fixed now: a later Fire power-up
+          does not change this bomb. 160 ticks is about
+          2.7 s; with the Detonator there is no fuse.
+        end note
+
+        stage -> stage : bombs.add(bomb)
+        note right of stage
+          The list keeps placement order, so the
+          Detonator can find the oldest bomb.
+          The player still overlaps this bomb and
+          can walk off it ("Move Bomberman").
+        end note
+
+        loop for each explosion
+            stage -> explosion : burns(cell)
+            explosion --> stage : burning
+            opt burning and bomb not yet queued
+                stage -> stage : explosionQueue.add(bomb)
+            end
+        end
+        note right of stage
+          Placing into a lingering flame is only possible
+          with Flame Pass or Mystery invincibility. Such a
+          bomb explodes in this same tick, in the bombs
+          step ("Explode Bomb").
+        end note
+    end
+end
+
+stage --> game
+game --> bridge
+bridge --> view
+note over view, bridge : The frame is then drawn as in\n"Explode Bomb" (getState, draw, sounds).
+
+@enduml

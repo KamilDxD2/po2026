@@ -55,8 +55,10 @@ rectangle "Bomberman (NES 1985 rules)" {
     usecase "Move Bomberman" as UC_Move
     ' Not possible inside a soft block (Wall Pass), on the door, on a
     ' power-up, on a cell that already has a bomb, or when the bomb
-    ' limit is reached.
-    ' The bomb snaps to the cell under Bomberman's center.
+    ' limit is reached. One bomb per key press. The bomb snaps to the
+    ' cell under Bomberman's center, keeps the fire range it had when
+    ' placed and explodes after about 2.7 s (no fuse with the
+    ' Detonator). Placed into a lingering flame, it explodes at once.
     usecase "Place Bomb" as UC_PlaceBomb
     ' Needs the Detonator power-up; sets off the oldest bomb.
     ' With the Detonator, bombs have no fuse and wait for this.
@@ -85,8 +87,11 @@ rectangle "Bomberman (NES 1985 rules)" {
     ' Shows GAME OVER and the final score, updates the top score;
     ' a key press returns to the main menu.
     usecase "End Game" as UC_EndGame
-    ' Each enemy type has its own speed and movement pattern.
-    ' Enemies turn around when they reach a bomb.
+    ' Each enemy type has its own speed, direction timer and movement
+    ' strategy (random, chasing along its row/column, alternating,
+    ' junction walker, pursuer). Enemies turn only at a cell's center
+    ' or when blocked (bombs, blocks), pass through each other, see
+    ' only along lines they could walk, and die in lingering flames.
     usecase "Move Enemies" as UC_MoveEnemies
     ' Blast spreads in 4 directions up to the fire range: destroys soft
     ' blocks (revealing a hidden power-up or the door once they finish
