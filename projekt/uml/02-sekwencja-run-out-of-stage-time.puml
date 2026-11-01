@@ -1,0 +1,103 @@
+@startuml
+title Run Out of Stage Time
+
+hide footbox
+
+legend top right
+  |<#E6E6E6> View (React / TypeScript) |
+  |<#CFE3F7> Controller (Java) |
+  |<#D8F0D8> Model (Java) |
+endlegend
+autonumber
+
+skinparam ParticipantBackgroundColor LightCyan
+skinparam ParticipantBorderColor DarkSlateGray
+skinparam ActorBackgroundColor White
+skinparam ActorBorderColor DarkSlateGray
+skinparam ArrowColor SlateGray
+skinparam SequenceLifeLineBorderColor SlateGray
+skinparam SequenceGroupBorderColor DarkSlateGray
+skinparam DefaultFontName Arial
+skinparam note {
+    BackgroundColor LightYellow
+    BorderColor Orange
+}
+
+
+' ==========================================
+' Participants, coloured by MVC layer as in "Explode Bomb" (see legend).
+' The stage timer is part of the third step of stage.update(), just
+' before the enemies move. Includes "Spawn Enemy Wave" (10 Pontans).
+' ==========================================
+actor "Time" as time
+
+participant "GameLoop" as view #E6E6E6
+
+participant "GameBridge" as bridge #CFE3F7
+
+participant "game : Game" as game #D8F0D8
+participant "stage : Stage" as stage #D8F0D8
+participant "EnemyFactory" as factory #D8F0D8
+participant "pontan : Enemy" as pontan #D8F0D8
+
+time -> view : next animation frame
+view -> bridge : tick(inputMask)
+bridge -> game : update(input)
+game -> stage : update(input)
+
+note over stage, factory
+  Order of stage.update(): 1. the player ("Move Bomberman", then
+  "Place Bomb" and "Detonate Bomb Remotely"), 2. bombs ("Explode
+  Bomb"), 3. the stage timer (this diagram) and enemies ("Move
+  Enemies"). The timer runs only while the stage runs (PLAYING or
+  DYING), not while paused or on the "STAGE n" screen.
+end note
+
+opt timeLeft > 0
+    stage -> stage : timeLeft--
+    note right of stage
+      Counted in ticks: 200 game seconds,
+      each about 1.55 real seconds (93 ticks).
+      The view shows timeLeft in game seconds.
+    end note
+
+    opt timeLeft reached 0
+        stage -> stage : enemies.clear()
+        note right of stage
+          All enemies vanish at once, including
+          dying ones. No points for them.
+        end note
+
+        loop 10 times
+            stage -> factory : create(PONTAN, random spawn cell)
+            create pontan
+            factory -> pontan : new Enemy(PONTAN type, Pursuer strategy, cell)
+            factory --> stage : pontan
+            stage -> stage : enemies.add(pontan)
+        end
+        note right of factory
+          Spawn Enemy Wave. A spawn cell is any random
+          cell with no block, bomb or lingering flame,
+          except the player's own cell. There is no
+          safe distance, so a Pontan can appear right
+          next to the player. Pontan is fast (1.0 px
+          per tick) and passes soft blocks, as in
+          "Move Enemies".
+        end note
+    end
+end
+
+note over stage, pontan
+  This happens only once per stage: timeLeft stays at 0.
+  Play continues; the door still needs noEnemiesLeft(),
+  so all Pontans must be killed first. Waves still pending
+  from a bombed door or power-up spawn nobody, because the
+  stage already holds 10 living enemies.
+end note
+
+stage --> game
+game --> bridge
+bridge --> view
+note over view, bridge : The frame is then drawn as in\n"Explode Bomb" (getState, draw, sounds).
+
+@enduml

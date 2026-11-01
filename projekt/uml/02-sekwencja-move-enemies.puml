@@ -58,8 +58,9 @@ game -> stage : update(input)
 
 note over stage, explosion
   Everything below runs within one tick (1/60 s), as the third part of
-  stage.update(): 1. the player ("Move Bomberman", "Place Bomb"),
-  2. bombs ("Explode Bomb"), 3. enemies (this diagram). Enemies pass through each other,
+  stage.update(): 1. the player ("Move Bomberman", "Place Bomb",
+  "Detonate Bomb Remotely"), 2. bombs ("Explode Bomb"), 3. the stage
+  timer ("Run Out of Stage Time"), then enemies (this diagram). Enemies pass through each other,
   so they never check one another. Touching the player is checked in
   "Move Bomberman" on the next tick.
 end note

@@ -63,8 +63,9 @@ game -> stage : update(input)
 note over stage, board
   Everything below runs within one tick (1/60 s).
   Order of stage.update(): 1. the player (this diagram;
-  "Place Bomb" runs right after the movement), 2. bombs
-  ("Explode Bomb"), 3. enemies ("Move Enemies").
+  "Place Bomb" and "Detonate Bomb Remotely" run right after
+  the movement), 2. bombs ("Explode Bomb"), 3. the stage
+  timer ("Run Out of Stage Time") and enemies ("Move Enemies").
 end note
 
 ' ==========================================

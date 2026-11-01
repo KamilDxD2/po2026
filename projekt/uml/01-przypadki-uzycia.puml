@@ -60,8 +60,8 @@ rectangle "Bomberman (NES 1985 rules)" {
     ' placed and explodes after about 2.7 s (no fuse with the
     ' Detonator). Placed into a lingering flame, it explodes at once.
     usecase "Place Bomb" as UC_PlaceBomb
-    ' Needs the Detonator power-up; sets off the oldest bomb.
-    ' With the Detonator, bombs have no fuse and wait for this.
+    ' Needs the Detonator power-up; one key press sets off the oldest
+    ' bomb. With the Detonator, new bombs have no fuse and wait for this.
     usecase "Detonate Bomb Remotely" as UC_Remote
 
     ' Column 2: consequences
@@ -80,7 +80,8 @@ rectangle "Bomberman (NES 1985 rules)" {
     ' Bombed door or power-up: once the flame goes out, the stage's
     ' wave type appears at that cell, filling the stage up to 10
     ' enemies; the power-up is destroyed, the door survives.
-    ' Stage time out: all enemies are replaced by 10 Pontans.
+    ' Stage time out: all enemies are replaced by 10 Pontans at
+    ' random cells.
     usecase "Spawn Enemy Wave" as UC_Spawn
 
     ' Column 3: end of game and events driven by time
@@ -101,7 +102,9 @@ rectangle "Bomberman (NES 1985 rules)" {
     ' passes exposed power-ups and the door.
     usecase "Explode Bomb" as UC_Explode
     ' After 200 game seconds (about 1.55 real seconds each), all
-    ' enemies are replaced by 10 Pontans.
+    ' enemies are replaced by 10 Pontans at random cells (even right
+    ' next to Bomberman, but never on his own cell). Happens once per
+    ' stage.
     ' Play continues; the stage still needs every enemy dead.
     usecase "Run Out of Stage Time" as UC_TimeOut
 }

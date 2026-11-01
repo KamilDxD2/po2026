@@ -52,7 +52,8 @@ game -> stage : update(input)
 
 note over stage, board
   Runs within one tick, in the player's step of stage.update(),
-  after the movement in "Move Bomberman". input.bombPressed() is
+  after the movement in "Move Bomberman" and before "Detonate
+  Bomb Remotely". input.bombPressed() is
   true only in the tick the key goes down: GameBridge keeps one
   Input object and updates it with each new mask, so it knows the
   previous one. Holding the key places just one bomb.

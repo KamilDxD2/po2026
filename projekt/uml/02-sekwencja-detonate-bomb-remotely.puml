@@ -1,0 +1,90 @@
+@startuml
+title Detonate Bomb Remotely
+
+hide footbox
+
+legend top right
+  |<#E6E6E6> View (React / TypeScript) |
+  |<#CFE3F7> Controller (Java) |
+  |<#D8F0D8> Model (Java) |
+endlegend
+autonumber
+
+skinparam ParticipantBackgroundColor LightCyan
+skinparam ParticipantBorderColor DarkSlateGray
+skinparam ActorBackgroundColor White
+skinparam ActorBorderColor DarkSlateGray
+skinparam ArrowColor SlateGray
+skinparam SequenceLifeLineBorderColor SlateGray
+skinparam SequenceGroupBorderColor DarkSlateGray
+skinparam DefaultFontName Arial
+skinparam note {
+    BackgroundColor LightYellow
+    BorderColor Orange
+}
+
+
+' ==========================================
+' Participants, coloured by MVC layer as in "Explode Bomb" (see legend).
+' Part of the player's step of stage.update(), after "Place Bomb".
+' Always includes "Explode Bomb".
+' ==========================================
+actor "Player" as user
+actor "Time" as time
+
+participant "GameLoop" as view #E6E6E6
+
+participant "GameBridge" as bridge #CFE3F7
+
+participant "game : Game" as game #D8F0D8
+participant "stage : Stage" as stage #D8F0D8
+participant "player : Player" as player #D8F0D8
+
+user -> view : press detonate key
+view -> view : inputMask |= DETONATE (cleared on release)
+time -> view : next animation frame
+view -> bridge : tick(inputMask)
+bridge -> game : update(input)
+game -> stage : update(input)
+
+note over stage, player
+  Runs within one tick, in the player's step of stage.update(),
+  after "Place Bomb". input.detonatePressed() is true only in the
+  tick the key goes down, as for the bomb key: one press sets off
+  one bomb.
+end note
+
+opt player alive and input.detonatePressed()
+    stage -> player : hasDetonator()
+    player --> stage : detonator
+
+    opt detonator
+        stage -> stage : oldest = first bomb in bombs\nthat is not yet queued
+        note right of stage
+          bombs keeps placement order ("Place Bomb").
+          Bombs placed before the Detonator was picked
+          up still count; they keep their fuse too.
+        end note
+
+        opt oldest exists
+            stage -> stage : explosionQueue.add(oldest)
+            ref over stage, player
+              Explode Bomb: the bomb explodes in this same
+              tick, in the bombs step of stage.update().
+            end ref
+        end
+    end
+end
+
+note over stage, player
+  Nothing happens without the Detonator, without bombs,
+  or while the player is dead. The Detonator is lost on
+  death, and the stage's bombs go with the old stage.
+end note
+
+stage --> game
+game --> bridge
+bridge --> view
+note over view, bridge : The frame is then drawn as in\n"Explode Bomb" (getState, draw, sounds).
+
+@enduml

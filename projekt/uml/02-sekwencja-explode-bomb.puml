@@ -58,8 +58,9 @@ note over game, board
   Everything from here until the frame is drawn runs within
   one tick (1/60 s), so the player sees the whole explosion
   appear at once. Order of stage.update(): 1. the player
-  ("Move Bomberman", "Place Bomb"), 2. bombs (this diagram),
-  3. enemies ("Move Enemies").
+  ("Move Bomberman", then "Place Bomb" and "Detonate Bomb Remotely"),
+  2. bombs (this diagram), 3. the stage timer ("Run Out of Stage
+  Time") and enemies ("Move Enemies").
 end note
 
 loop for each bomb on the stage
