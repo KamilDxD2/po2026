@@ -54,16 +54,19 @@ note right of table
   Reads one line per stage with a BufferedReader (java.io):
   enemy types and counts, hidden power-up type and the
   wave enemy type. Soft blocks: 54 on stage 1, plus 2 for
-  each later stage (152 on stage 50).
+  each later stage (152 on stage 50). If the file cannot be
+  read or parsed, the app shows an error instead of the main
+  menu: the game cannot run without it.
 end note
 bridge --> view
 view -> view : read "topScore" from localStorage\n(empty on the very first start)
 view -> bridge : loadTopScore(bytes)
 create high
-bridge -> high : HighScore.readFrom(bytes)
+bridge -> high : HighScore.readFrom(stream over bytes),\nor new HighScore() if nothing usable is stored
 note right of high
   Saveable, like Save Game: the top score survives
-  closing the browser. No bytes yet: top score 0.
+  closing the browser. Nothing stored yet, or damaged
+  data: the top score starts at 0.
 end note
 bridge --> view
 
@@ -97,8 +100,9 @@ group Set Up Stage (also used by "Lose Life" and "Exit Stage")
     game -> sfactory : create(stageData, player, this, random)
     note right of game
       this = Game as StageListener.
-      random = java.util.Random; JUnit tests
-      pass a fixed seed to get the same layout.
+      random = the game's one java.util.Random,
+      created with the Game. JUnit tests pass a
+      fixed seed to get the same layout.
     end note
 
     create board
@@ -135,11 +139,13 @@ group Set Up Stage (also used by "Lose Life" and "Exit Stage")
     end note
 
     create stage
-    sfactory -> stage : new Stage(stageData, board, enemies, player, listener)
+    sfactory -> stage : new Stage(stageData, board, enemies, player, listener, random)
     stage -> player : respawnAt(start cell)
     note right of stage
       respawnAt puts the player on the start cell
       and makes them alive again (after a death).
+      The stage keeps random for Pontan spawn
+      cells and hands it to enemies (Arena).
       The timer starts at 200 game seconds
       (about 1.55 real seconds each).
     end note

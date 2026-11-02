@@ -36,12 +36,20 @@ rectangle "Bomberman (NES 1985 rules)" {
     ' "STAGE n" screen for about 3 s. The main menu shows the top score,
     ' which is kept in browser storage like the saves.
     usecase "Start New Game" as UC_Start
-    ' Restores the saved game exactly; it starts paused.
+    ' Offered only when a save exists. Shows the save list (name, date,
+    ' stage, score, lives; newest first). Restores the chosen save
+    ' exactly; it starts paused. A broken or outdated save is marked as
+    ' damaged and cannot be loaded.
     usecase "Load Saved Game" as UC_Load
     ' Done from the pause menu; replaces the NES password system.
     ' Saves the whole game exactly as it is (stage, board, player,
-    ' enemies, bombs, explosions, timer, lives, score).
+    ' enemies, bombs, explosions, timer, lives, score) under a name the
+    ' player types: 1 to 20 characters, and not the name of an existing
+    ' save (ignoring case; overwriting is not allowed). No limit on the
+    ' number of saves.
     usecase "Save Game" as UC_Save
+    ' From the save list, after a confirmation. Works on damaged saves.
+    usecase "Delete Save" as UC_Delete
     ' Opens the pause menu (resume, save, quit), only while playing
     ' (not during a death or a "STAGE n" screen). While paused, the
     ' stage, its bombs and its timer stand still.
@@ -74,11 +82,11 @@ rectangle "Bomberman (NES 1985 rules)" {
     ' top score; a key press returns to the main menu.
     usecase "Exit Stage" as UC_Exit
     ' After a 3 s death animation (the game keeps running), restarts
-    ' the stage with a new random layout. All power-ups except Bombs,
-    ' Flames and Speed are lost; the score is kept.
+    ' the stage with a new random layout. All power-ups except the
+    ' Bomb, Fire and Speed upgrades are lost; the score is kept.
     usecase "Lose Life" as UC_LoseLife
-    ' Bombed door or power-up: once the flame goes out, the stage's
-    ' wave type appears at that cell, filling the stage up to 10
+    ' Bombed door or power-up: once no flame covers that cell any more,
+    ' the stage's wave type appears there, filling the stage up to 10
     ' enemies; the power-up is destroyed, the door survives.
     ' Stage time out: all enemies are replaced by 10 Pontans at
     ' random cells.
@@ -129,6 +137,7 @@ UC_TimeOut -- time
 ' EXTEND: optional, only when the [condition] holds.
 ' The arrow points from the extension to the base use case.
 ' ==========================================
+UC_Load <.. UC_Delete : <<extend>>\n[player deletes a save\nfrom the save list]
 UC_Move <.. UC_PickUp : <<extend>>\n[fully on a power-up's cell]
 UC_Move <.. UC_Exit : <<extend>>\n[fully on the door's cell,\nno enemies left or pending]
 UC_Move <.. UC_LoseLife : <<extend>>\n[walks into enemy or flame,\nnot protected]
@@ -137,6 +146,7 @@ UC_LoseLife <.. UC_EndGame : <<extend>>\n[no lives left]
 UC_LoseLife ..> UC_MoveEnemies : <<extend>>\n[enemy reaches player,\nnot invincible]
 UC_LoseLife ..> UC_Explode : <<extend>>\n[player in blast, no Flame Pass,\nnot invincible]
 UC_Spawn ..> UC_Explode : <<extend>>\n[blast hits exposed\ndoor or power-up]
+UC_PlaceBomb <.. UC_Explode : <<extend>>\n[placed into a\nlingering flame]
 
 ' ==========================================
 ' INCLUDE: the base use case always performs the included one.
@@ -145,7 +155,9 @@ UC_Spawn ..> UC_Explode : <<extend>>\n[blast hits exposed\ndoor or power-up]
 UC_Remote ..> UC_Explode : <<include>>
 UC_Spawn <.. UC_TimeOut : <<include>>
 
-' Layout only: keeps "Detonate Bomb Remotely" in the Player column.
+' Layout only: keeps "Detonate Bomb Remotely" and "Place Bomb" in the
+' Player column.
 UC_Remote -[hidden]- UC_Spawn
+UC_PlaceBomb -[hidden]- UC_LoseLife
 
 @enduml

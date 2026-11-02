@@ -81,7 +81,7 @@ opt deathTimer reached 0
         game -> game : lives--
         game -> player : loseTemporaryPowerUps()
         note right of player
-          Keeps Bombs, Fire and Speed. Loses Wall Pass,
+          Keeps the Bomb, Fire and Speed upgrades. Loses Wall Pass,
           Bomb Pass, Flame Pass, Detonator and Mystery.
           The score is kept.
         end note
@@ -102,17 +102,20 @@ bridge --> view
 ' ==========================================
 view -> bridge : getState()
 bridge --> view : tiles, entities, events and game state
-alt game state has just become GAME_OVER
+alt game state is GAME_OVER
     view -> view : show "GAME OVER" with the final score
-    view -> bridge : exportTopScore()
-    bridge -> high : writeTo(out)
-    high --> bridge
-    bridge --> view : bytes
-    view -> view : store bytes as "topScore"\nin localStorage
+    opt the state has just become GAME_OVER
+        view -> bridge : exportTopScore()
+        bridge -> high : writeTo(out)
+        high --> bridge
+        bridge --> view : bytes
+        view -> view : store bytes as "topScore"\nin localStorage
+    end
     note right of view
-      Done once. Winning and "Quit to Main
-      Menu" store the top score the same way.
-      A key press then returns to the main menu.
+      The screen shows on every frame; the top score
+      is stored only once. Winning and "Quit to Main
+      Menu" store it the same way. A key press then
+      returns to the main menu.
     end note
 else
     view -> view : draw canvas, play sounds

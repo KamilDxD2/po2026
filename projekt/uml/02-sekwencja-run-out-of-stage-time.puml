@@ -91,8 +91,9 @@ note over stage, pontan
   This happens only once per stage: timeLeft stays at 0.
   Play continues; the door still needs noEnemiesLeft(),
   so all Pontans must be killed first. Waves still pending
-  from a bombed door or power-up spawn nobody, because the
-  stage already holds 10 living enemies.
+  from a bombed door or power-up only fill the stage up to
+  10 living enemies, so while all Pontans live they add
+  nobody.
 end note
 
 stage --> game

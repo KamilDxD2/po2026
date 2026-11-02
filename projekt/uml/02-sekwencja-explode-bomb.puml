@@ -153,13 +153,14 @@ loop while explosionQueue is not empty
         opt power-up
             stage -> board : removeItem(cell)
         end
-        stage -> explosion : addPendingWave(cell)
+        stage -> stage : pendingWaves.add(cell)
         note over stage, board
-          The wave appears at this cell (the door, or where the
-          power-up was) only once this explosion goes out (see the
-          end of the diagram). Until then the door stays closed,
-          even with no enemies alive. The door survives; a
-          power-up is destroyed.
+          pendingWaves is a Set of cells, so a door hit by several
+          explosions waits for one wave only. The wave appears at
+          this cell (the door, or where the power-up was) once no
+          flame covers it any more (see the end of the diagram).
+          Until then the door stays closed, even with no enemies
+          alive. The door survives; a power-up is destroyed.
         end note
     end
 
@@ -186,7 +187,7 @@ game --> bridge
 bridge --> view
 
 view -> bridge : getState()
-bridge --> view : tiles, entities and events
+bridge --> view : tiles, entities, events and game state
 view -> view : draw canvas, play sounds
 
 ... about half a second later (each tick starts as above) ...
@@ -201,17 +202,23 @@ stage -> explosion : tick()
 explosion --> stage : expired
 opt expired
     stage -> stage : explosions.remove(explosion)
-    loop for each pending wave cell of this explosion
-        stage -> factory : createWave(stageData.waveType(), cell, 10 - livingEnemyCount())
-        factory --> stage : newEnemies
-        stage -> stage : enemies.addAll(newEnemies)
-    end
-    note over stage, factory
-      One enemy type per stage, enough to fill the stage up to
-      10 living enemies (none if there are already 10, so a door
-      hit by two explosions of one chain spawns only one wave).
-      The flame is already gone, so the new enemies survive it.
-    end note
 end
+loop for each cell in pendingWaves
+    stage -> stage : isBurning(cell)
+    note right of stage : Asks every remaining\nexplosion burns(cell).
+    opt not burning
+        stage -> factory : createWave(stageData.waveType(), cell, 10 - livingEnemyCount())
+        factory --> stage : newEnemies (possibly none)
+        stage -> stage : enemies.addAll(newEnemies)
+        stage -> stage : pendingWaves.remove(cell)
+    end
+end
+note over stage, factory
+  One enemy type per stage, enough to fill the stage up to 10
+  living enemies (none if there are already 10; the wave is
+  still removed, so the door can open later). A wave waits until
+  no flame at all covers its cell, so its enemies never appear
+  inside the fire of this or any other explosion.
+end note
 
 @enduml

@@ -26,7 +26,7 @@ skinparam note {
 ' ==========================================
 ' Participants, coloured by MVC layer as in "Explode Bomb" (see legend).
 ' Stage implements the Arena interface (isPassable, lookForPlayer,
-' playerCell), so Player and Enemy can ask where they may walk without
+' playerCell, random), so Player and Enemy can ask where they may walk without
 ' depending on Stage. Player and Enemy both extend the abstract class
 ' Creature (see "Move Enemies").
 ' ==========================================
@@ -66,6 +66,7 @@ note over stage, board
   "Place Bomb" and "Detonate Bomb Remotely" run right after
   the movement), 2. bombs ("Explode Bomb"), 3. the stage
   timer ("Run Out of Stage Time") and enemies ("Move Enemies").
+  In the tick in which the player exits, 2 and 3 are skipped.
 end note
 
 ' ==========================================
@@ -82,7 +83,9 @@ opt player alive and a direction key is held
     note right of player
       1 px every 1.33 ticks; 1 px per tick
       with Speed. A sub-pixel counter
-      carries the remainder.
+      carries the remainder. Never more
+      than 1 px per tick, so no cell's
+      center pixel is ever skipped.
     end note
 
     player -> player : ahead = next cell in direction,\nfrom the nearest lane
@@ -173,7 +176,9 @@ end
 ' 3. What is on the player's cell (every tick, even when
 '    standing still), only for a living player
 ' ==========================================
-opt player alive and exposed power-up on cell
+stage -> board : exposedItemAt(cell)
+board --> stage : item (NONE, DOOR or POWER_UP)
+opt player alive and item is POWER_UP
     stage -> player : isFullyInside(cell)
     player --> stage : inside
     opt inside
@@ -196,7 +201,7 @@ opt player alive and exposed power-up on cell
     end note
 end
 
-opt player alive and exposed door on cell and noEnemiesLeft()
+opt player alive and item is DOOR and noEnemiesLeft()
     note left of stage
       noEnemiesLeft(): no living
       enemies and no waves still
@@ -208,8 +213,10 @@ opt player alive and exposed door on cell and noEnemiesLeft()
     opt inside
         stage -> game : onStageCleared()
         note right of game
-          Exit Stage: Game switches stages after this tick
-          and adds 1 life; power-ups carry over. The next
+          Exit Stage: the stage stops this update right after
+          the player's step, so no bomb or enemy can hit the
+          player after he has exited. Game switches stages
+          after this tick and adds 1 life; power-ups carry over. The next
           stage is set up as in "Start New Game", "STAGE n"
           screen first. After stage 50: state = WON, the score
           goes to HighScore, the view shows a "you won" screen

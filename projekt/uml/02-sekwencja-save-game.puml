@@ -1,0 +1,160 @@
+@startuml
+title Save Game
+
+hide footbox
+
+legend top right
+  |<#E6E6E6> View (React / TypeScript) |
+  |<#CFE3F7> Controller (Java) |
+  |<#D8F0D8> Model (Java) |
+endlegend
+autonumber
+
+skinparam ParticipantBackgroundColor LightCyan
+skinparam ParticipantBorderColor DarkSlateGray
+skinparam ActorBackgroundColor White
+skinparam ActorBorderColor DarkSlateGray
+skinparam ArrowColor SlateGray
+skinparam SequenceLifeLineBorderColor SlateGray
+skinparam SequenceGroupBorderColor DarkSlateGray
+skinparam DefaultFontName Arial
+skinparam note {
+    BackgroundColor LightYellow
+    BorderColor Orange
+}
+
+
+' ==========================================
+' Participants, coloured by MVC layer as in "Explode Bomb" (see legend).
+' Game is the root of a save: save(out, name, savedAt) writes a
+' SaveHeader, which the save list can read without loading the whole
+' game, and then its parts. Every other model class below implements
+' Saveable: writeTo(out) writes only its own fields (encapsulation),
+' and a matching static readFrom(in) or readState(in) restores them
+' ("Load Saved Game"). HighScore uses the same interface ("Start New
+' Game", "Lose Life").
+' ==========================================
+actor "Player" as user
+
+participant "GameLoop" as view #E6E6E6
+
+participant "GameBridge" as bridge #CFE3F7
+
+participant "SaveName" as rule #D8F0D8
+participant "game : Game" as game #D8F0D8
+participant "header : SaveHeader" as header #D8F0D8
+participant "player : Player" as player #D8F0D8
+participant "stage : Stage" as stage #D8F0D8
+participant "board : Board" as board #D8F0D8
+participant "enemy : Enemy" as enemy #D8F0D8
+participant "strategy : MovementStrategy" as strategy #D8F0D8
+participant "bomb : Bomb" as bomb #D8F0D8
+participant "explosion : Explosion" as explosion #D8F0D8
+
+note over view, game
+  The pause menu is only available while PLAYING, so the game is never
+  saved in the middle of a death or a "STAGE n" screen. While PAUSED
+  nothing changes, so the save is a consistent snapshot.
+end note
+
+' ==========================================
+' 1. Choosing a name
+' ==========================================
+user -> view : choose "Save" in the pause menu
+view -> view : show a name field
+user -> view : type a name and confirm
+view -> view : existing = names of all stored saves
+view -> bridge : saveGame(name, existing)
+bridge -> rule : SaveName.check(name, existing)
+rule --> bridge : OK, EMPTY, TOO_LONG or TAKEN
+note right of rule
+  The name is trimmed; 1 to 20 characters.
+  TAKEN when a stored save has the same
+  name, ignoring upper/lower case.
+  Overwriting is not allowed.
+end note
+
+alt the name is not OK
+    bridge --> view : the reason
+    view -> view : show the reason;\nthe name field stays open
+else the name is OK
+    ' ==========================================
+    ' 2. Writing the game
+    ' ==========================================
+    bridge -> bridge : out = new DataOutputStream(\nnew ByteArrayOutputStream())
+    bridge -> game : save(out, name, System.currentTimeMillis())
+
+    create header
+    game -> header : new SaveHeader(name, savedAt,\nstageNumber, lives, score)
+    game -> header : writeTo(out)
+    note right of header
+      SAVE_VERSION, name, date, stage, lives and score.
+      The version lets a later version of the game
+      reject an old, incompatible save.
+    end note
+
+    game -> player : writeTo(out)
+    note right of player
+      Position, sub-pixel counter, bomb capacity, fire range,
+      Speed, Wall Pass, Bomb Pass, Flame Pass, Detonator,
+      Mystery time left. Game writes the player because
+      Game owns it; Stage only refers to it.
+    end note
+
+    game -> stage : writeTo(out)
+    stage -> stage : write timeLeft and pendingWaves
+    stage -> board : writeTo(out)
+    note right of board
+      Every cell: hard, soft, crumbling (with ticks
+      left) or free; the hidden or exposed door and
+      power-up (with its type).
+    end note
+
+    stage -> stage : write enemies.size()
+    loop for each enemy
+        stage -> enemy : writeTo(out)
+        enemy -> enemy : write type, position, sub-pixel counter,\ndirection, direction timer, alive or death animation
+        enemy -> strategy : writeTo(out)
+        note right of strategy
+          Its own state, e.g. Ovapi's toward/away
+          flag. Strategies without state write nothing.
+        end note
+    end
+
+    stage -> stage : write bombs.size()
+    loop for each bomb, in placement order
+        stage -> bomb : writeTo(out)
+        note right of bomb : Cell, fire range, fuse ticks\nleft or "no fuse".
+    end
+
+    stage -> stage : write explosions.size()
+    loop for each explosion
+        stage -> explosion : writeTo(out)
+        note right of explosion
+          Flame cells, ticks left and kill
+          counter (for the score of later kills).
+        end note
+    end
+
+    note over stage, explosion
+      Not saved: the explosion queue (always empty between ticks),
+      the stage data (re-read from the stage table by stage number)
+      and the Random (loading creates a new one; only future layouts
+      and AI choices use it, and they are random anyway).
+      All timers are saved in ticks, never as clock time, so the
+      real time between saving and loading does not matter.
+    end note
+
+    stage --> game
+    game --> bridge
+    bridge -> bridge : bytes = toByteArray()
+    bridge --> view : bytes
+    view -> view : store bytes in localStorage under\n"save:" + name (as Base64 text)
+    alt stored
+        view -> view : show "Game saved"; the game stays paused
+    else the browser refuses (storage full)
+        view -> view : show "Could not save: delete an old save";\nthe game stays paused and nothing is lost
+    end
+end
+
+@enduml

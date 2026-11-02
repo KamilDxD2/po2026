@@ -27,7 +27,10 @@ skinparam note {
 ' Participants, coloured by MVC layer as in "Explode Bomb" (see legend).
 ' Player and Enemy both extend the abstract class Creature (pixel
 ' position, sub-pixel counter, hitbox, centerCell(), isFullyInside(),
-' isAlive(), die()). An enemy's die() also returns its base points.
+' isAlive(), die(), and the abstract passesSoftBlocks() and
+' passesBombs() that isPassable asks). An enemy's die() also returns
+' its base points; resetTimer(random) picks a new timer length from
+' its type's range.
 ' Each Enemy has an EnemyType (speed, direction-timer range, points,
 ' wall pass) and a MovementStrategy (Strategy pattern):
 '   RandomWalk     - Ballom
@@ -35,9 +38,15 @@ skinparam note {
 '   Alternating    - Ovapi
 '   JunctionWalker - Parse
 '   Pursuer        - Pontan
+' Strategies get random numbers (directions, timer lengths) from
+' arena.random(), the stage's Random, so enemies hold no Random of
+' their own and nothing random has to be saved per enemy.
 ' Speed tiers, in px per tick (Bomberman: 0.75): slowest 0.375
 ' (Kondoria), slow 0.5 (Ballom, Ovapi), medium 0.75 (Onil, Dall),
-' fast 1.0 (Minvo, Parse, Pontan). Constants, to be tuned by eye.
+' fast 1.0 (Minvo, Parse, Pontan). Constants, to be tuned by eye, but
+' never above 1 px per tick: creatures move 1 px at a time, so they
+' always land exactly on each cell's center pixel, where enemies turn.
+' A faster enemy could jump over the center and never turn again.
 ' ==========================================
 actor "Time" as time
 
@@ -90,7 +99,7 @@ loop for each living enemy
         alt RandomWalk (Ballom)
             opt direction timer ran out
                 strategy -> strategy : direction = random passable direction
-                strategy -> enemy : resetTimer()
+                strategy -> enemy : resetTimer(arena.random())
             end
         else AxisChaser (Onil, Dall, Minvo, Kondoria)
             strategy -> stage : lookForPlayer(enemy)
@@ -100,14 +109,14 @@ loop for each living enemy
                 note right of strategy : Does not reset\nthe timer.
             else direction timer ran out
                 strategy -> strategy : direction = random passable direction
-                strategy -> enemy : resetTimer()
+                strategy -> enemy : resetTimer(arena.random())
             end
         else Alternating (Ovapi)
             opt direction timer ran out
                 strategy -> stage : playerCell()
                 stage --> strategy : cell
                 strategy -> strategy : direction = toward the player, or\naway from him (alternates each time)
-                strategy -> enemy : resetTimer()
+                strategy -> enemy : resetTimer(arena.random())
             end
         else JunctionWalker (Parse, no timer)
             strategy -> stage : lookForPlayer(enemy)
@@ -149,7 +158,7 @@ loop for each living enemy
     else blocked by a hard block, a soft block or a bomb
         enemy -> strategy : onBlocked(enemy, arena)
         strategy --> enemy : new direction
-        enemy -> enemy : resetTimer()
+        enemy -> enemy : resetTimer(arena.random())
         note right of enemy
           At a cell's center it may take any passable
           direction; between two cells it can only
