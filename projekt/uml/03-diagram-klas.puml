@@ -59,9 +59,9 @@ end note
 package "agh.po.bomberman.controller" #CFE3F7 {
     class GameBridge <<utility>> {
         {static} + loadStages(text : String) : boolean
-        {static} + loadTopScore(bytes : byte[]) : void
+        {static} + loadTopScore(data : String) : void
         {static} + getTopScore() : int
-        {static} + exportTopScore() : byte[]
+        {static} + exportTopScore() : String
         {static} + startNewGame() : void
         {static} + tick(inputMask : int) : void
         {static} + getState() : String
@@ -69,8 +69,8 @@ package "agh.po.bomberman.controller" #CFE3F7 {
         {static} + resume() : void
         {static} + quitToMenu() : void
         {static} + saveGame(name : String, existingNames : String[]) : SaveResult
-        {static} + listSaves(names : String[], saves : byte[][]) : String
-        {static} + loadGame(bytes : byte[]) : boolean
+        {static} + listSaves(names : String[], saves : String[]) : String
+        {static} + loadGame(data : String) : boolean
     }
     note left of GameBridge
       Only static members: TeaVM exports static
@@ -78,24 +78,28 @@ package "agh.po.bomberman.controller" #CFE3F7 {
       lines into the model are static fields.
       getState() and listSaves() return text (JSON),
       so no model class depends on TeaVM.
+      Saves and the top score cross to JavaScript as
+      Base64 text (java.util.Base64): TeaVM cannot
+      export a byte[][] parameter, and localStorage
+      stores text anyway.
     end note
 
     class SaveResult <<value>> {
         - check : String
         - name : String
-        - bytes : byte[]
-        + SaveResult(check : String, name : String, bytes : byte[])
+        - data : String
+        + SaveResult(check : String, name : String, data : String)
         + getCheck() : String
         + getName() : String
-        + getBytes() : byte[]
+        + getData() : String
     }
     note left of SaveResult
       Read by TypeScript, so it holds
-      only text and bytes. check: "OK",
-      "EMPTY", "TOO_LONG" or "TAKEN";
-      name: the trimmed name to store
-      the save under; bytes: only when
-      check is "OK".
+      only text. check: "OK", "EMPTY",
+      "TOO_LONG" or "TAKEN"; name: the
+      trimmed name to store the save
+      under; data: the save as Base64,
+      only when check is "OK".
     end note
 }
 

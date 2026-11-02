@@ -60,7 +60,8 @@ note right of table
 end note
 bridge --> view : true, or false if it cannot be parsed
 view -> view : read "topScore" from localStorage\n(empty on the very first start)
-view -> bridge : loadTopScore(bytes)
+view -> bridge : loadTopScore(data)
+bridge -> bridge : bytes = Base64 decode of data
 create high
 bridge -> high : HighScore.readFrom(stream over bytes),\nor new HighScore() if nothing usable is stored
 note right of high

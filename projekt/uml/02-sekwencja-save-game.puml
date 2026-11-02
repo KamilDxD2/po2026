@@ -147,9 +147,9 @@ else the name is OK
 
     stage --> game
     game --> bridge
-    bridge -> bridge : bytes = toByteArray()
-    bridge --> view : SaveResult ("OK", the trimmed name, bytes)
-    view -> view : store the bytes in localStorage under\n"save:" + the trimmed name (as Base64 text)
+    bridge -> bridge : data = Base64 encode of toByteArray()
+    bridge --> view : SaveResult ("OK", the trimmed name, data)
+    view -> view : store data in localStorage under\n"save:" + the trimmed name
     alt stored
         view -> view : show "Game saved"; the game stays paused
     else the browser refuses (storage full)

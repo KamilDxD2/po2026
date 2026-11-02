@@ -108,8 +108,8 @@ alt game state is GAME_OVER
         view -> bridge : exportTopScore()
         bridge -> high : writeTo(out)
         high --> bridge
-        bridge --> view : bytes
-        view -> view : store bytes as "topScore"\nin localStorage
+        bridge --> view : the bytes as Base64 text
+        view -> view : store the text as "topScore"\nin localStorage
     end
     note right of view
       The screen shows on every frame; the top score

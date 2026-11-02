@@ -59,9 +59,10 @@ end note
 ' 1. The save list
 ' ==========================================
 user -> view : choose "Load Saved Game"
-view -> view : read every stored save\n(name from the key, bytes from Base64)
+view -> view : read every stored save\n(name from the key, Base64 text as stored)
 view -> bridge : listSaves(names, saves)
 loop for each save
+    bridge -> bridge : bytes = Base64 decode of this save
     create summary
     bridge -> summary : SaveHeader.readFrom(stream over this save's bytes)
     note right of summary
@@ -69,8 +70,9 @@ loop for each save
       stage, lives and score. The rest of
       the save is not touched.
     end note
-    opt wrong version or broken data (IOException)
+    opt not valid Base64, wrong version or broken data
         bridge -> bridge : use SaveHeader.damaged(name) for this save
+        note right of bridge : IOException, or IllegalArgumentException\nfrom the Base64 decoder.
     end
 end
 bridge -> bridge : sort the summaries with SaveHeader.NEWEST_FIRST\n(a Comparator: newest first, damaged last)
@@ -94,7 +96,8 @@ end
 ' 2. Loading the chosen save
 ' ==========================================
 user -> view : pick a save that is not damaged
-view -> bridge : loadGame(bytes of that save)
+view -> bridge : loadGame(data of that save)
+bridge -> bridge : bytes = Base64 decode of data
 bridge -> bridge : in = new DataInputStream(\nnew ByteArrayInputStream(bytes))
 
 create game
@@ -160,7 +163,7 @@ alt the version matches and the data is complete
       No timer runs until then; all timers continue
       from the ticks that were saved.
     end note
-else wrong version, broken data or impossible values\n(e.g. stage 0 or 51): IOException
+else not valid Base64, wrong version, broken data or impossible\nvalues (e.g. stage 0 or 51): IllegalArgumentException or IOException
     game --> bridge : error
     bridge --> view : false
     view -> view : show "The save could not be loaded"
