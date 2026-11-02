@@ -75,7 +75,7 @@ note right of rule
 end note
 
 alt the name is not OK
-    bridge --> view : the reason
+    bridge --> view : SaveResult with the reason
     view -> view : show the reason;\nthe name field stays open
 else the name is OK
     ' ==========================================
@@ -148,8 +148,8 @@ else the name is OK
     stage --> game
     game --> bridge
     bridge -> bridge : bytes = toByteArray()
-    bridge --> view : bytes
-    view -> view : store bytes in localStorage under\n"save:" + name (as Base64 text)
+    bridge --> view : SaveResult ("OK", the trimmed name, bytes)
+    view -> view : store the bytes in localStorage under\n"save:" + the trimmed name (as Base64 text)
     alt stored
         view -> view : show "Game saved"; the game stays paused
     else the browser refuses (storage full)

@@ -44,7 +44,7 @@ participant "highScore : HighScore" as high #D8F0D8
 ' 1. The death is reported (within the tick in which it happens)
 ' ==========================================
 stage -> game : onPlayerHit()
-game -> game : state = DYING,\ndeathTimer = about 3 s
+game -> game : state = DYING,\ndeathTimer = DEATH_TICKS (about 3 s)
 note right of game
   The stage keeps running while the death animation
   plays: enemies move and bombs explode, but the dead

@@ -87,9 +87,9 @@ loop while explosionQueue is not empty
     stage -> stage : bombs.remove(next)
 
     create explosion
-    stage -> explosion : new Explosion(position, fireRange)
+    stage -> explosion : new Explosion(next.getCell(), next.getFireRange())
     stage -> explosion : spread(board, bombs)
-    explosion -> explosion : flameCells.add(position)
+    explosion -> explosion : flameCells.add(center)
     note right of explosion : The bomb's own cell\nburns too.
 
     loop for each of 4 directions, up to fireRange cells
@@ -125,11 +125,14 @@ loop while explosionQueue is not empty
             end note
         end
     end
-    explosion --> stage : hitCells (flameCells + brokenBlocks), hitBombs
+    explosion --> stage
     stage -> stage : explosions.add(explosion)
+    stage -> explosion : getHitCells()
+    explosion --> stage : hitCells (flame cells + broken blocks)
 
     loop for each living enemy in hitCells
         stage -> enemy : die()
+        stage -> enemy : getPoints()
         enemy --> stage : basePoints
         stage -> explosion : scoreKill(basePoints)
         explosion --> stage : points
@@ -143,12 +146,16 @@ loop while explosionQueue is not empty
       Example: two Minvos give 800 + 1000.
     end note
 
+    stage -> explosion : getHitBombs()
+    explosion --> stage : hitBombs
     loop for each otherBomb in hitBombs (chain reaction)
         opt otherBomb not yet queued
             stage -> stage : explosionQueue.add(otherBomb)
         end
     end
 
+    stage -> explosion : getFlameCells()
+    explosion --> stage : flameCells
     loop for each exposed power-up or door in flameCells
         opt power-up
             stage -> board : removeItem(cell)
@@ -207,7 +214,7 @@ loop for each cell in pendingWaves
     stage -> stage : isBurning(cell)
     note right of stage : Asks every remaining\nexplosion burns(cell).
     opt not burning
-        stage -> factory : createWave(stageData.waveType(), cell, 10 - livingEnemyCount())
+        stage -> factory : createWave(stageData.waveType(), cell,\nMAX_ENEMIES - livingEnemyCount())
         factory --> stage : newEnemies (possibly none)
         stage -> stage : enemies.addAll(newEnemies)
         stage -> stage : pendingWaves.remove(cell)

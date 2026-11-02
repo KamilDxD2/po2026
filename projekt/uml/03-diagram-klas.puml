@@ -1,0 +1,685 @@
+@startuml
+title Bomberman - class diagram
+
+' ==========================================
+' Notation (UML)
+'   - private   + public   # protected   ~ package (same Java package)
+'   underlined = static, italic = abstract
+'   A *-- B   composition: A owns B, B lives and dies with A
+'   A --> B   association: A keeps a reference to B
+'   A <|-- B  inheritance: B extends A (also interface extends interface)
+'   A <|.. B  realization: B implements interface A
+'   A ..> B   dependency: A uses or creates B
+'   A -o Saveable   ball notation: A implements interface Saveable
+'                   (used for Saveable only, which 7 classes implement,
+'                   to avoid 7 long lines across the diagram)
+' A field that refers to an object of another class is drawn as a line
+' with the field name on it, not repeated in the box. Values (numbers,
+' text, enums, Cell, Hitbox and collections of them) stay in the box.
+' Lines marked [hidden] or [norank] only help the automatic layout.
+' Colours match the MVC legend of the sequence diagrams.
+' ==========================================
+skinparam classAttributeIconSize 0
+skinparam DefaultFontName Arial
+skinparam ClassBackgroundColor White
+skinparam ClassBorderColor DarkSlateGray
+skinparam ArrowColor SlateGray
+skinparam PackageBorderColor DarkSlateGray
+skinparam linetype ortho
+skinparam note {
+    BackgroundColor LightYellow
+    BorderColor Orange
+}
+hide empty members
+set namespaceSeparator none
+
+legend top right
+  |<#E6E6E6> View (React / TypeScript) |
+  |<#CFE3F7> Controller (Java) |
+  |<#D8F0D8> Model (Java) |
+  |<#FFFFFF> Class --o Saveable : the class implements Saveable (UML ball notation) |
+endlegend
+
+' ==========================================
+' View (TypeScript, not Java): only shows where the controller is called from
+' ==========================================
+package "view (React / TypeScript)" #E6E6E6 {
+    class GameLoop <<TypeScript>>
+}
+note right of GameLoop
+  Not Java. Draws the canvas, plays sounds, turns
+  keys into inputMask, shows the menus and the save
+  list, keeps the saves and the top score in
+  localStorage.
+end note
+
+' ==========================================
+' Controller
+' ==========================================
+package "agh.po.bomberman.controller" #CFE3F7 {
+    class GameBridge <<utility>> {
+        {static} + loadStages(text : String) : boolean
+        {static} + loadTopScore(bytes : byte[]) : void
+        {static} + getTopScore() : int
+        {static} + exportTopScore() : byte[]
+        {static} + startNewGame() : void
+        {static} + tick(inputMask : int) : void
+        {static} + getState() : String
+        {static} + pause() : void
+        {static} + resume() : void
+        {static} + quitToMenu() : void
+        {static} + saveGame(name : String, existingNames : String[]) : SaveResult
+        {static} + listSaves(names : String[], saves : byte[][]) : String
+        {static} + loadGame(bytes : byte[]) : boolean
+    }
+    note left of GameBridge
+      Only static members: TeaVM exports static
+      methods (@JSExport) to JavaScript. Its four
+      lines into the model are static fields.
+      getState() and listSaves() return text (JSON),
+      so no model class depends on TeaVM.
+    end note
+
+    class SaveResult <<value>> {
+        - check : String
+        - name : String
+        - bytes : byte[]
+        + SaveResult(check : String, name : String, bytes : byte[])
+        + getCheck() : String
+        + getName() : String
+        + getBytes() : byte[]
+    }
+    note left of SaveResult
+      Read by TypeScript, so it holds
+      only text and bytes. check: "OK",
+      "EMPTY", "TOO_LONG" or "TAKEN";
+      name: the trimmed name to store
+      the save under; bytes: only when
+      check is "OK".
+    end note
+}
+
+' ==========================================
+' Model
+' ==========================================
+package "agh.po.bomberman.model" #D8F0D8 {
+
+    class Game {
+        - random : Random
+        - state : GameState
+        - stageNumber : int
+        - lives : int
+        - score : int
+        - introTimer : int
+        - deathTimer : int
+        - stageCleared : boolean
+        {static} + START_LIVES : int = 2
+        {static} + LAST_STAGE : int = 50
+        {static} + INTRO_TICKS : int = 180
+        {static} + DEATH_TICKS : int = 180
+        --
+        + Game(stageTable : StageTable, highScore : HighScore)
+        {static} + readFrom(in : DataInputStream, stageTable : StageTable,\n      highScore : HighScore) : Game
+        + update(input : Input) : void
+        + pause() : void
+        + resume() : void
+        + quit() : void
+        + save(out : DataOutputStream, name : String, savedAt : long) : void
+        + onEnemyKilled(points : int) : void
+        + onPlayerHit() : void
+        + onStageCleared() : void
+        + getState() : GameState
+        + getStageNumber() : int
+        + getLives() : int
+        + getScore() : int
+        + getPlayer() : Player
+        + getStage() : Stage
+        - setUpStage() : void
+        - nextStage() : void
+        - finishDeath() : void
+    }
+
+    enum GameState {
+        STAGE_INTRO
+        PLAYING
+        PAUSED
+        DYING
+        GAME_OVER
+        WON
+    }
+
+    interface StageListener {
+        + onEnemyKilled(points : int) : void
+        + onPlayerHit() : void
+        + onStageCleared() : void
+    }
+
+    interface Arena {
+        + isPassable(cell : Cell, mover : Creature) : boolean
+        + lookForPlayer(enemy : Enemy) : Direction
+        + playerCell() : Cell
+        + random() : Random
+    }
+
+    class Stage {
+        - random : Random
+        - timeLeft : int
+        - cleared : boolean
+        - pendingWaves : Set<Cell>
+        - events : List<GameEvent>
+        {static} + TIME_LIMIT : int = 18600
+        {static} + MAX_ENEMIES : int = 10
+        --
+        + Stage(stageData : StageData, board : Board, enemies : List<Enemy>,\n      player : Player, listener : StageListener, random : Random)
+        {static} + readFrom(in : DataInputStream, stageData : StageData,\n      player : Player, listener : StageListener, random : Random) : Stage
+        + update(input : Input) : void
+        + isPassable(cell : Cell, mover : Creature) : boolean
+        + lookForPlayer(enemy : Enemy) : Direction
+        + playerCell() : Cell
+        + random() : Random
+        + noEnemiesLeft() : boolean
+        + livingEnemyCount() : int
+        + getTimeLeft() : int
+        + getBoard() : Board
+        + getEnemies() : List<Enemy>
+        + getBombs() : List<Bomb>
+        + getExplosions() : List<Explosion>
+        + drainEvents() : List<GameEvent>
+        + writeTo(out : DataOutputStream) : void
+        - updatePlayer(input : Input) : void
+        - placeBomb() : void
+        - detonate() : void
+        - updateBombs() : void
+        - explode(bomb : Bomb) : void
+        - spawnPendingWaves() : void
+        - updateTimer() : void
+        - updateEnemies() : void
+        - isBurning(cell : Cell) : boolean
+    }
+    Stage -() Saveable
+
+    class Input {
+        - mask : int
+        - previousMask : int
+        - direction : Direction
+        {static} + UP : int = 1
+        {static} + DOWN : int = 2
+        {static} + LEFT : int = 4
+        {static} + RIGHT : int = 8
+        {static} + BOMB : int = 16
+        {static} + DETONATE : int = 32
+        --
+        + update(mask : int) : void
+        + getDirection() : Direction
+        + bombPressed() : boolean
+        + detonatePressed() : boolean
+    }
+
+    enum GameEvent {
+        BOMB_PLACED
+        BOMB_EXPLODED
+        ENEMY_KILLED
+        POWER_UP_TAKEN
+        PLAYER_DIED
+        WAVE_SPAWNED
+        TIME_UP
+        STAGE_CLEARED
+    }
+
+    class HighScore {
+        - topScore : int
+        + HighScore()
+        {static} + readFrom(in : DataInputStream) : HighScore
+        + submit(score : int) : void
+        + getTopScore() : int
+        + writeTo(out : DataOutputStream) : void
+    }
+    HighScore -() Saveable
+
+    ' ------------------------------------------
+    package "model.board" {
+        class Board {
+            - tiles : Tile[][]
+            - crumbleTicks : Map<Cell, Integer>
+            - doorCell : Cell
+            - powerUpCell : Cell
+            {static} + WIDTH : int = 31
+            {static} + HEIGHT : int = 13
+            {static} + START : Cell = new Cell(1, 1)
+            {static} + CRUMBLE_TICKS : int = 30
+            --
+            + Board(width : int, height : int)
+            {static} + readFrom(in : DataInputStream) : Board
+            + tileAt(cell : Cell) : Tile
+            + placeSoftBlock(cell : Cell) : void
+            + hideDoor(cell : Cell) : void
+            + hidePowerUp(cell : Cell, powerUp : PowerUp) : void
+            + crumble(cell : Cell) : void
+            + tick() : void
+            + exposedItemAt(cell : Cell) : Item
+            + takeItem(cell : Cell) : PowerUp
+            + removeItem(cell : Cell) : void
+            + getPowerUp() : PowerUp
+            + writeTo(out : DataOutputStream) : void
+        }
+        Board -() Saveable
+
+        enum Tile {
+            FREE
+            HARD
+            SOFT
+            CRUMBLING
+        }
+
+        enum Item {
+            NONE
+            DOOR
+            POWER_UP
+        }
+
+        class Cell <<value>> {
+            - col : int
+            - row : int
+            + Cell(col : int, row : int)
+            + col() : int
+            + row() : int
+            + next(direction : Direction) : Cell
+            + equals(other : Object) : boolean
+            + hashCode() : int
+        }
+
+        enum Direction {
+            UP
+            DOWN
+            LEFT
+            RIGHT
+            NONE
+            --
+            - dx : int
+            - dy : int
+            + dx() : int
+            + dy() : int
+            + opposite() : Direction
+        }
+    }
+
+    ' ------------------------------------------
+    package "model.creature" {
+        abstract class Creature {
+            - x : int
+            - y : int
+            - subPixel : double
+            - alive : boolean
+            + getX() : int
+            + getY() : int
+            + centerCell() : Cell
+            + isAtCellCenter() : boolean
+            + isFullyInside(cell : Cell) : boolean
+            + overlaps(cell : Cell) : boolean
+            + hitbox() : Hitbox
+            + isAlive() : boolean
+            + die() : void
+            + {abstract} passesSoftBlocks() : boolean
+            + {abstract} passesBombs() : boolean
+            # {abstract} speed() : double
+            # stepThisTick() : int
+            # moveBy(dx : int, dy : int) : void
+            # placeAt(cell : Cell) : void
+            # revive() : void
+            # writeBaseState(out : DataOutputStream) : void
+            # readBaseState(in : DataInputStream) : void
+        }
+        Creature -() Saveable
+
+        class Player {
+            - bombCapacity : int
+            - fireRange : int
+            - speedUp : boolean
+            - wallPass : boolean
+            - bombPass : boolean
+            - flamePass : boolean
+            - detonator : boolean
+            - invincibleTicks : int
+            {static} + MAX_BOMBS : int = 10
+            {static} + MAX_FIRE_RANGE : int = 5
+            {static} + INVINCIBLE_TICKS : int = 2040
+            --
+            + Player()
+            {static} + readFrom(in : DataInputStream) : Player
+            + move(direction : Direction, arena : Arena) : void
+            + tick() : void
+            + respawnAt(cell : Cell) : void
+            + getBombCapacity() : int
+            + getFireRange() : int
+            + hasDetonator() : boolean
+            + isInvincible() : boolean
+            + isFireProof() : boolean
+            + passesSoftBlocks() : boolean
+            + passesBombs() : boolean
+            + increaseBombCapacity() : void
+            + increaseFireRange() : void
+            + grantSpeed() : void
+            + grantWallPass() : void
+            + grantBombPass() : void
+            + grantFlamePass() : void
+            + grantDetonator() : void
+            + startInvincibility() : void
+            + loseTemporaryPowerUps() : void
+            # speed() : double
+            + writeTo(out : DataOutputStream) : void
+        }
+
+        class Enemy {
+            - type : EnemyType
+            - direction : Direction
+            - directionTimer : int
+            - deathTicks : int
+            --
+            ~ Enemy(type : EnemyType, strategy : MovementStrategy)
+            ~ Enemy(type : EnemyType, strategy : MovementStrategy, cell : Cell)
+            ~ readState(in : DataInputStream) : void
+            + move(arena : Arena) : void
+            + die() : void
+            + tickDeath() : boolean
+            + getPoints() : int
+            + getType() : EnemyType
+            + getDirection() : Direction
+            + timerRanOut() : boolean
+            + resetTimer(random : Random) : void
+            + passesSoftBlocks() : boolean
+            + passesBombs() : boolean
+            # speed() : double
+            + writeTo(out : DataOutputStream) : void
+        }
+
+        enum EnemyType {
+            BALLOM
+            ONIL
+            DALL
+            MINVO
+            OVAPI
+            KONDORIA
+            PARSE
+            PONTAN
+            --
+            - speed : double
+            - minTimer : int
+            - maxTimer : int
+            - points : int
+            - wallPass : boolean
+            + speed() : double
+            + hasTimer() : boolean
+            + randomTimer(random : Random) : int
+            + points() : int
+            + wallPass() : boolean
+        }
+
+        class EnemyFactory <<utility>> {
+            {static} + create(type : EnemyType, cell : Cell) : Enemy
+            {static} + createWave(type : EnemyType, cell : Cell, count : int) : List<Enemy>
+            {static} + readEnemy(in : DataInputStream) : Enemy
+            {static} - strategyFor(type : EnemyType) : MovementStrategy
+        }
+
+        class Hitbox <<value>> {
+            - x : int
+            - y : int
+            - size : int
+            + Hitbox(x : int, y : int, size : int)
+            + overlaps(other : Hitbox) : boolean
+        }
+    }
+
+    ' ------------------------------------------
+    package "model.ai" {
+        interface MovementStrategy {
+            + chooseDirection(enemy : Enemy, arena : Arena) : Direction
+            + onBlocked(enemy : Enemy, arena : Arena) : Direction
+            + writeTo(out : DataOutputStream) : void
+            + readState(in : DataInputStream) : void
+        }
+        class RandomWalk
+        class AxisChaser {
+            - watchesRow : boolean
+            - watchesColumn : boolean
+            + AxisChaser(watchesRow : boolean, watchesColumn : boolean)
+        }
+        class Alternating {
+            - towardPlayer : boolean
+            + writeTo(out : DataOutputStream) : void
+            + readState(in : DataInputStream) : void
+        }
+        class JunctionWalker
+        class Pursuer
+    }
+    note bottom of MovementStrategy
+      Strategy pattern. Every class below implements
+      chooseDirection() and onBlocked() ("Move Enemies").
+      writeTo() and readState() are default methods that
+      do nothing; only Alternating has state to save.
+    end note
+
+    ' ------------------------------------------
+    package "model.bomb" {
+        class Bomb {
+            - cell : Cell
+            - fireRange : int
+            - fuseTicks : int
+            {static} + FUSE_TICKS : int = 160
+            {static} + NO_FUSE : int = -1
+            --
+            + Bomb(cell : Cell, fireRange : int, fuseTicks : int)
+            {static} + readFrom(in : DataInputStream) : Bomb
+            + tick() : boolean
+            + getCell() : Cell
+            + getFireRange() : int
+            + writeTo(out : DataOutputStream) : void
+        }
+        Bomb -() Saveable
+
+        class Explosion {
+            - center : Cell
+            - fireRange : int
+            - flameCells : Set<Cell>
+            - brokenBlocks : Set<Cell>
+            - ticksLeft : int
+            - killCount : int
+            {static} + DURATION : int = 30
+            --
+            + Explosion(center : Cell, fireRange : int)
+            {static} + readFrom(in : DataInputStream) : Explosion
+            + spread(board : Board, bombs : List<Bomb>) : void
+            + getFlameCells() : Set<Cell>
+            + getHitCells() : Set<Cell>
+            + getHitBombs() : List<Bomb>
+            + burns(cell : Cell) : boolean
+            + scoreKill(basePoints : int) : int
+            + tick() : boolean
+            + writeTo(out : DataOutputStream) : void
+        }
+        Explosion -() Saveable
+    }
+
+    ' ------------------------------------------
+    package "model.powerup" {
+        interface PowerUp {
+            + applyTo(player : Player) : void
+            + getType() : PowerUpType
+            {static} + of(type : PowerUpType) : PowerUp
+        }
+        enum PowerUpType {
+            BOMB
+            FIRE
+            SPEED
+            WALL_PASS
+            BOMB_PASS
+            FLAME_PASS
+            DETONATOR
+            MYSTERY
+        }
+        class BombUp
+        class FireUp
+        class SpeedUp
+        class WallPass
+        class BombPass
+        class FlamePass
+        class Detonator
+        class Mystery
+    }
+    note bottom of PowerUp
+      Every class below implements applyTo() and
+      getType(). They are package-private, so the
+      static factory method PowerUp.of(type) is the
+      only way to create one.
+    end note
+
+    ' ------------------------------------------
+    package "model.setup" {
+        class StageTable {
+            {static} + parse(text : String) : StageTable
+            + get(stageNumber : int) : StageData
+        }
+        class StageData <<value>> {
+            - stageNumber : int
+            - enemies : Map<EnemyType, Integer>
+            - powerUpType : PowerUpType
+            - waveType : EnemyType
+            + StageData(stageNumber : int, enemies : Map<EnemyType, Integer>,\n      powerUpType : PowerUpType, waveType : EnemyType)
+            + stageNumber() : int
+            + enemies() : Map<EnemyType, Integer>
+            + powerUpType() : PowerUpType
+            + waveType() : EnemyType
+            + softBlockCount() : int
+        }
+        class StageFactory <<utility>> {
+            {static} + create(stageData : StageData, player : Player,\n      listener : StageListener, random : Random) : Stage
+            {static} - startArea() : Set<Cell>
+        }
+    }
+
+    ' ------------------------------------------
+    package "model.save" {
+        interface Saveable {
+            + writeTo(out : DataOutputStream) : void
+        }
+        class SaveHeader {
+            - name : String
+            - savedAt : long
+            - stageNumber : int
+            - lives : int
+            - score : int
+            - damaged : boolean
+            {static} + SAVE_VERSION : int = 1
+            {static} + NEWEST_FIRST : Comparator<SaveHeader>
+            --
+            + SaveHeader(name : String, savedAt : long, stageNumber : int,\n      lives : int, score : int)
+            {static} + readFrom(in : DataInputStream) : SaveHeader
+            {static} + damaged(name : String) : SaveHeader
+            + getName() : String
+            + getSavedAt() : long
+            + getStageNumber() : int
+            + getLives() : int
+            + getScore() : int
+            + isDamaged() : boolean
+            + writeTo(out : DataOutputStream) : void
+        }
+        SaveHeader -() Saveable
+        class SaveName <<utility>> {
+            {static} + MAX_LENGTH : int = 20
+            {static} + check(name : String, existingNames : String[]) : NameCheck
+        }
+        enum NameCheck {
+            OK
+            EMPTY
+            TOO_LONG
+            TAKEN
+        }
+    }
+}
+
+' ==========================================
+' Relationships
+' ==========================================
+' MVC: the view calls only the controller, the controller calls the
+' model, and the model knows neither of them.
+GameLoop ..> GameBridge : calls
+GameBridge .left.> SaveResult : returns
+GameBridge --> "0..1" Game : game
+GameBridge --> "1" StageTable : stageTable
+GameBridge --> "1" HighScore : highScore
+GameBridge --> "1" Input : input
+GameBridge ..> SaveName : checks names
+GameBridge ..> SaveHeader : lists saves
+
+' Game and its stage (Observer: the stage reports to a StageListener)
+Game .right.|> StageListener
+Game *-- "1" Stage : stage
+Game *-- "1" Player : player
+Game --> "1" StageTable : stageTable
+Game --> "1" HighScore : highScore
+Game ..> StageFactory : sets up stages
+Game ..> SaveHeader : writes / reads
+
+Stage .right.|> Arena
+Stage --> "1" StageListener : listener
+Stage --> "1" StageData : stageData
+Stage --> "1" Player : player
+Stage *-- "1" Board : board
+Stage *-- "0..*\n{ordered}" Bomb : bombs
+Stage --> "0..*\n{ordered}" Bomb : explosionQueue
+Stage *-- "0..*" Explosion : explosions
+Stage *-- "0..*" Enemy : enemies
+Stage ..> EnemyFactory : waves, Pontans
+
+Board *-- "0..1" PowerUp : powerUp
+
+' Creatures
+Creature <|-- Player
+Creature <|-- Enemy
+Enemy *-- "1" MovementStrategy : strategy
+Arena <.. Player : asks where to walk
+Arena <.. Enemy : asks where to walk
+Arena <.. MovementStrategy : looks around
+EnemyFactory ..> Enemy : creates
+EnemyFactory ..> MovementStrategy : creates
+
+' Strategy pattern
+MovementStrategy <|.. RandomWalk
+MovementStrategy <|.. AxisChaser
+MovementStrategy <|.. Alternating
+MovementStrategy <|.. JunctionWalker
+MovementStrategy <|.. Pursuer
+
+' Power-ups
+PowerUp <|.. BombUp
+PowerUp <|.. FireUp
+PowerUp <|.. SpeedUp
+PowerUp <|.. WallPass
+PowerUp <|.. BombPass
+PowerUp <|.. FlamePass
+PowerUp <|.. Detonator
+PowerUp <|.. Mystery
+PowerUp ..> Player : upgrades
+
+' Bombs
+Explosion ..> Board : spreads over
+Explosion --> "0..*" Bomb : hitBombs
+
+' Stage setup (Factory)
+StageTable *-- "50" StageData : stages
+StageFactory ..> Stage : creates
+StageFactory ..> Board : creates
+StageFactory ..> PowerUp : PowerUp.of
+StageFactory ..> EnemyFactory : uses
+
+' Saving: the classes that implement Saveable carry a ball (see the
+' packages); interface MovementStrategy extends it.
+Saveable <|-[norank]- MovementStrategy
+
+' Layout only (no meaning): power-ups in two rows
+BombUp -[hidden]down- WallPass
+FireUp -[hidden]down- BombPass
+SpeedUp -[hidden]down- FlamePass
+Detonator -[hidden]down- Mystery
+
+@enduml

@@ -58,7 +58,7 @@ note right of table
   read or parsed, the app shows an error instead of the main
   menu: the game cannot run without it.
 end note
-bridge --> view
+bridge --> view : true, or false if it cannot be parsed
 view -> view : read "topScore" from localStorage\n(empty on the very first start)
 view -> bridge : loadTopScore(bytes)
 create high
@@ -73,7 +73,7 @@ bridge --> view
 ... later, in the main menu ...
 
 view -> bridge : getTopScore()
-bridge -> high : best()
+bridge -> high : getTopScore()
 high --> bridge : topScore
 bridge --> view : topScore
 view -> view : show main menu with the top score
@@ -86,7 +86,7 @@ view -> bridge : startNewGame()
 
 create game
 bridge -> game : new Game(stageTable, highScore)
-game -> game : lives = 2, score = 0, stageNumber = 1
+game -> game : lives = START_LIVES, score = 0,\nstageNumber = 1
 note right of game : 2 extra lives, as shown\non screen; +1 per cleared stage.
 
 create player
@@ -126,7 +126,7 @@ group Set Up Stage (also used by "Lose Life" and "Exit Stage")
 
     sfactory -> board : hideDoor(random soft block)
     sfactory -> board : hidePowerUp(another random soft block,\nPowerUp.of(stageData.powerUpType()))
-    note right of board : PowerUp.of(type) creates\nthe matching subclass.
+    note right of board : PowerUp.of(type) creates an object\nof the matching class, e.g. FireUp.
 
     loop for each enemy listed in stageData
         sfactory -> efactory : create(type, random free cell away from startArea)
@@ -140,17 +140,19 @@ group Set Up Stage (also used by "Lose Life" and "Exit Stage")
 
     create stage
     sfactory -> stage : new Stage(stageData, board, enemies, player, listener, random)
-    stage -> player : respawnAt(start cell)
+    stage -> player : respawnAt(Board.START)
     note right of stage
-      respawnAt puts the player on the start cell
-      and makes them alive again (after a death).
+      respawnAt puts the player on the start cell,
+      makes them alive again (after a death) and ends
+      Mystery invincibility, so it never carries into
+      the next stage or a restart.
       The stage keeps random for Pontan spawn
       cells and hands it to enemies (Arena).
       The timer starts at 200 game seconds
       (about 1.55 real seconds each).
     end note
     sfactory --> game : stage
-    game -> game : state = STAGE_INTRO,\nintroTimer = about 3 s
+    game -> game : state = STAGE_INTRO,\nintroTimer = INTRO_TICKS (about 3 s)
     note right of game
       The view shows a black screen with "STAGE n".
       While it shows, update() only counts introTimer

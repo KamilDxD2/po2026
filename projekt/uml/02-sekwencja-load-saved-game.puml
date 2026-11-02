@@ -70,11 +70,11 @@ loop for each save
       the save is not touched.
     end note
     opt wrong version or broken data (IOException)
-        bridge -> bridge : mark this save as damaged
+        bridge -> bridge : use SaveHeader.damaged(name) for this save
     end
 end
-bridge -> bridge : sort summaries, newest first\n(a Comparator on the date; damaged last)
-bridge --> view : summaries
+bridge -> bridge : sort the summaries with SaveHeader.NEWEST_FIRST\n(a Comparator: newest first, damaged last)
+bridge --> view : the summaries as text (JSON)
 view -> view : show the save list: name, date, stage,\nscore and lives; damaged saves marked
 
 opt the player deletes a save (Delete Save)

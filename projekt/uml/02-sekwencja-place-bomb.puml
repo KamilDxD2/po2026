@@ -62,7 +62,7 @@ end note
 opt player alive and input.bombPressed()
     stage -> player : centerCell()
     player --> stage : cell
-    stage -> player : bombCapacity()
+    stage -> player : getBombCapacity()
     player --> stage : capacity
     stage -> board : tileAt(cell)
     board --> stage : tile
@@ -78,18 +78,19 @@ opt player alive and input.bombPressed()
           - a bomb is already on this cell.
         end note
 
-        stage -> player : fireRange()
+        stage -> player : getFireRange()
         player --> stage : range
         stage -> player : hasDetonator()
         player --> stage : detonator
 
         create bomb
-        stage -> bomb : new Bomb(cell, range, detonator ? no fuse : 160 ticks)
+        stage -> bomb : new Bomb(cell, range, detonator ? NO_FUSE : FUSE_TICKS)
         note right of bomb
           Snaps to the cell under the player's center.
           Fire range is fixed now: a later Fire power-up
-          does not change this bomb. 160 ticks is about
-          2.7 s; with the Detonator there is no fuse.
+          does not change this bomb. FUSE_TICKS = 160
+          ticks, about 2.7 s; with the Detonator there
+          is no fuse (NO_FUSE).
         end note
 
         stage -> stage : bombs.add(bomb)

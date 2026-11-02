@@ -73,11 +73,14 @@ rectangle "Bomberman (NES 1985 rules)" {
     usecase "Detonate Bomb Remotely" as UC_Remote
 
     ' Column 2: consequences
-    ' Happens once Bomberman has entered the whole cell.
+    ' Happens once Bomberman has entered the whole cell. Bomb and Fire
+    ' stop at 10 bombs and fire range 5 (the stages hide one more of
+    ' each than needed; the extra one does nothing).
     usecase "Pick Up Power-up" as UC_PickUp
     ' Happens once Bomberman has entered the whole door cell, with no
     ' enemies alive and no waves still pending. Gives 1 extra life and
-    ' leads to the next stage. After stage 50 the game is won: a
+    ' leads to the next stage; power-ups carry over, except Mystery
+    ' invincibility, which ends with the stage. After stage 50 the game is won: a
     ' "you won" screen with the final score, which counts toward the
     ' top score; a key press returns to the main menu.
     usecase "Exit Stage" as UC_Exit

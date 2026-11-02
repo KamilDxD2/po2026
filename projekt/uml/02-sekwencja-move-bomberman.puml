@@ -73,7 +73,7 @@ end note
 ' 1. Movement (only while a direction is held)
 ' ==========================================
 opt player alive and a direction key is held
-    stage -> player : move(input.direction(), this)
+    stage -> player : move(input.getDirection(), this)
     note right of stage
       If two directions are held,
       the newer one wins.
@@ -139,7 +139,7 @@ player --> stage : cell
 
 stage -> player : isInvincible()
 player --> stage : invincible
-note right of player : Mystery: 34 s,\ncounted down every tick.
+note right of player : Mystery: 34 s (INVINCIBLE_TICKS),\ncounted down every tick (player.tick()).
 
 opt player alive and not invincible
     loop for each living enemy
@@ -187,11 +187,14 @@ opt player alive and item is POWER_UP
         stage -> powerUp : applyTo(player)
         powerUp -> player : its upgrade method, e.g. increaseFireRange()\nor grantWallPass()
         note over player, board
-          Each power-up type is its own PowerUp subclass:
-          Bomb, Fire, Speed, Wall Pass, Bomb Pass, Flame Pass,
-          Detonator, Mystery. The stage does not need to know
-          which one it picked up (polymorphism). Each type
-          also enforces its own maximum.
+          Each power-up type is its own class implementing the
+          PowerUp interface: BombUp, FireUp, SpeedUp, WallPass,
+          BombPass, FlamePass, Detonator, Mystery. The stage does
+          not need to know which one it picked up (polymorphism).
+          Player keeps each upgrade within its maximum
+          (MAX_BOMBS = 10, MAX_FIRE_RANGE = 5). The stages
+          hide one Bomb and one Fire more than needed; one
+          picked up at the maximum is used up and does nothing.
         end note
     end
     note right of stage
@@ -216,7 +219,8 @@ opt player alive and item is DOOR and noEnemiesLeft()
           Exit Stage: the stage stops this update right after
           the player's step, so no bomb or enemy can hit the
           player after he has exited. Game switches stages
-          after this tick and adds 1 life; power-ups carry over. The next
+          after this tick and adds 1 life; power-ups carry over,
+          except Mystery invincibility (respawnAt ends it). The next
           stage is set up as in "Start New Game", "STAGE n"
           screen first. After stage 50: state = WON, the score
           goes to HighScore, the view shows a "you won" screen

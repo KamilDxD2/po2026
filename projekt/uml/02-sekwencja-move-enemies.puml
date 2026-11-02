@@ -26,11 +26,11 @@ skinparam note {
 ' ==========================================
 ' Participants, coloured by MVC layer as in "Explode Bomb" (see legend).
 ' Player and Enemy both extend the abstract class Creature (pixel
-' position, sub-pixel counter, hitbox, centerCell(), isFullyInside(),
-' isAlive(), die(), and the abstract passesSoftBlocks() and
-' passesBombs() that isPassable asks). An enemy's die() also returns
-' its base points; resetTimer(random) picks a new timer length from
-' its type's range.
+' position, sub-pixel counter, hitbox(), centerCell(), isAtCellCenter(),
+' isFullyInside(), overlaps(), isAlive(), die(), and the abstract
+' passesSoftBlocks() and passesBombs() that isPassable asks). After
+' die(), getPoints() gives the enemy's base points; resetTimer(random)
+' asks its EnemyType for a new timer length (randomTimer).
 ' Each Enemy has an EnemyType (speed, direction-timer range, points,
 ' wall pass) and a MovementStrategy (Strategy pattern):
 '   RandomWalk     - Ballom
@@ -178,6 +178,7 @@ loop for each living enemy
         explosion --> stage : burning
         opt burning and enemy still alive
             stage -> enemy : die()
+            stage -> enemy : getPoints()
             enemy --> stage : basePoints
             stage -> explosion : scoreKill(basePoints)
             explosion --> stage : points
@@ -187,9 +188,10 @@ loop for each living enemy
 end
 
 note over stage, explosion
-  A killed enemy plays its death animation and is then removed
-  from the stage. It no longer counts as living, so it cannot
-  touch the player, and noEnemiesLeft() ignores it.
+  A killed enemy plays its death animation (tickDeath() counts it
+  down every tick) and is then removed from the stage. It no longer
+  counts as living, so it cannot touch the player, and
+  noEnemiesLeft() ignores it.
 end note
 
 stage --> game
