@@ -5,6 +5,7 @@
 // Keep in sync with the Java class (and uml/03-diagram-klas.puml).
 export interface GameBridge {
   pingJavaEngine(): number;
+  getState(): string;
 }
 
 interface TeaVMRuntime {
