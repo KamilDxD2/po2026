@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { loadBridge } from './bridge/gameBridge.ts';
+import { parseState } from './bridge/state.ts';
+import { drawBoard, SCALE } from './render/drawBoard.ts';
 
 function App() {
-  const [javaResponse, setJavaResponse] = useState<number | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -10,12 +12,22 @@ function App() {
 
     loadBridge()
       .then((bridge) => {
-        if (active) {
-          setJavaResponse(bridge.pingJavaEngine());
+        const canvas = canvasRef.current;
+        if (!active || canvas === null) {
+          return;
         }
+        const state = parseState(bridge.getState());
+        canvas.width = state.width * state.cellSize * SCALE;
+        canvas.height = state.height * state.cellSize * SCALE;
+        const ctx = canvas.getContext('2d');
+        if (ctx === null) {
+          setError('Canvas 2D is not available');
+          return;
+        }
+        drawBoard(ctx, state);
       })
       .catch((err: unknown) => {
-        console.error("WASM Load Error:", err);
+        console.error('WASM Load Error:', err);
         if (active) {
           setError(String(err));
         }
@@ -27,15 +39,10 @@ function App() {
   }, []);
 
   return (
-    <div style={{ textAlign: 'center', marginTop: '50px', fontFamily: 'sans-serif' }}>
-      <h1>Bomberman Engine (Official Wasm GC Bridge)</h1>
-      {error ? (
-        <h2 style={{ color: 'red' }}>Błąd: {error}</h2>
-      ) : (
-        <h2>
-          Java Backend mówi: <span style={{ color: 'green' }}>{javaResponse !== null ? javaResponse : 'Ładowanie...'}</span>
-        </h2>
-      )}
+    <div style={{ marginTop: '24px', fontFamily: 'sans-serif' }}>
+      <h1>Bomberman</h1>
+      {error !== null && <h2 style={{ color: 'red' }}>Błąd: {error}</h2>}
+      <canvas ref={canvasRef} style={{ maxWidth: '100%', imageRendering: 'pixelated' }} />
     </div>
   );
 }
