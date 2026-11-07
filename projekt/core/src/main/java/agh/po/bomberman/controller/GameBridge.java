@@ -1,17 +1,22 @@
 package agh.po.bomberman.controller;
 
+import agh.po.bomberman.model.board.Board;
 import org.teavm.jso.JSExport;
 
 public class GameBridge {
 
-    // Connection check for the view; replaced by the real bridge methods
-    // (loadStages, startNewGame, tick, getState, ...) as the model grows.
+    private static final Board board = new Board(Board.WIDTH, Board.HEIGHT);
+
     @JSExport
     public static int pingJavaEngine() {
         return 2026;
     }
 
-    // TeaVM needs an entry point; the view calls the @JSExport methods instead.
+    @JSExport
+    public static String getState() {
+        return StateJson.of(board);
+    }
+
     public static void main(String[] args) {
 
     }
