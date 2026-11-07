@@ -77,7 +77,8 @@ package "agh.po.bomberman.controller" #CFE3F7 {
       methods (@JSExport) to JavaScript. Its four
       lines into the model are static fields.
       getState() and listSaves() return text (JSON),
-      so no model class depends on TeaVM.
+      so no model class depends on TeaVM. StateJson
+      writes the getState() text.
       Saves and the top score cross to JavaScript as
       Base64 text (java.util.Base64): TeaVM cannot
       export a byte[][] parameter, and localStorage
@@ -100,6 +101,17 @@ package "agh.po.bomberman.controller" #CFE3F7 {
       trimmed name to store the save
       under; data: the save as Base64,
       only when check is "OK".
+    end note
+
+    class StateJson <<utility>> {
+        {static} ~ of(game : Game) : String
+    }
+    note right of StateJson
+      Package-private: only GameBridge uses it.
+      Builds the JSON with a StringBuilder (TeaVM has
+      no reflection, so no Gson or Jackson). tiles is
+      one letter per cell, row by row: F free, H hard,
+      S soft, C crumbling.
     end note
 }
 
@@ -249,12 +261,15 @@ package "agh.po.bomberman.model" #D8F0D8 {
             - powerUpCell : Cell
             {static} + WIDTH : int = 31
             {static} + HEIGHT : int = 13
+            {static} + CELL_SIZE : int = 16
             {static} + START : Cell = new Cell(1, 1)
             {static} + CRUMBLE_TICKS : int = 30
             --
             + Board(width : int, height : int)
             {static} + readFrom(in : DataInputStream) : Board
             + tileAt(cell : Cell) : Tile
+            + getWidth() : int
+            + getHeight() : int
             + placeSoftBlock(cell : Cell) : void
             + hideDoor(cell : Cell) : void
             + hidePowerUp(cell : Cell, powerUp : PowerUp) : void
@@ -608,6 +623,8 @@ package "agh.po.bomberman.model" #D8F0D8 {
 ' model, and the model knows neither of them.
 GameLoop ..> GameBridge : calls
 GameBridge .left.> SaveResult : returns
+GameBridge ..> StateJson : builds JSON with
+StateJson ..> Game : reads
 GameBridge --> "0..1" Game : game
 GameBridge --> "1" StageTable : stageTable
 GameBridge --> "1" HighScore : highScore
