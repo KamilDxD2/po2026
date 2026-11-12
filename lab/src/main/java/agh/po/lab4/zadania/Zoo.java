@@ -5,6 +5,7 @@ import agh.po.lab4.animals.Dog;
 import agh.po.lab4.animals.Parrot;
 import agh.po.lab4.animals.Snake;
 
+import java.util.Arrays;
 import java.util.Random;
 
 public class Zoo {
@@ -12,27 +13,15 @@ public class Zoo {
 
     public void fill() {
         Random random = new Random();
-        for (int i = 0; i < animals.length; i++) {
-            int r = random.nextInt(3);
-            switch (r) {
-                case 0:
-                    animals[i] = new Parrot("Parrot" + i);
-                    break;
-                case 1:
-                    animals[i] = new Dog("Dog" + i);
-                    break;
-                default:
-                    animals[i] = new Snake("Snake" + i);
-            }
-        }
+        Arrays.setAll(animals, i -> switch (random.nextInt(3)) {
+            case 0 -> new Parrot("Parrot" + i);
+            case 1 -> new Dog("Dog" + i);
+            default -> new Snake("Snake" + i);
+        });
     }
 
     public int sumLegs() {
-        int sum = 0;
-        for (Animal animal : animals) {
-            sum += animal.getLegs();
-        }
-        return sum;
+        return Arrays.stream(animals).mapToInt(a -> a.getLegs()).sum();
     }
 
     public void showAll() {
