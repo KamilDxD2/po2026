@@ -33,7 +33,6 @@ public class CodingBat {
 
     public static void main(String[] args) {
         CodingBat bat = new CodingBat();
-
     }
 
 }
