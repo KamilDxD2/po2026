@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { loadBridge } from './bridge/gameBridge.ts';
 import { parseState } from './bridge/state.ts';
 import { drawBoard, SCALE } from './render/drawBoard.ts';
+import { drawPlayer } from './render/drawPlayer.ts';
 
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -16,7 +17,11 @@ function App() {
         if (!active || canvas === null) {
           return;
         }
+        bridge.startNewGame();
         const state = parseState(bridge.getState());
+        if (state === null) {
+          return;
+        }
         canvas.width = state.width * state.cellSize * SCALE;
         canvas.height = state.height * state.cellSize * SCALE;
         const ctx = canvas.getContext('2d');
@@ -25,6 +30,7 @@ function App() {
           return;
         }
         drawBoard(ctx, state);
+        drawPlayer(ctx, state);
       })
       .catch((err: unknown) => {
         console.error('WASM Load Error:', err);

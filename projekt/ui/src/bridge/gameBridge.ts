@@ -4,6 +4,8 @@
 // @JSExport methods of agh.po.bomberman.controller.GameBridge.
 // Keep in sync with the Java class (and uml/03-diagram-klas.puml).
 export interface GameBridge {
+  startNewGame(): void;
+  tick(inputMask: number): void;
   getState(): string;
 }
 
