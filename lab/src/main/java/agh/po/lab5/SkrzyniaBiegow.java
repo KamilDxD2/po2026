@@ -16,15 +16,23 @@ public class SkrzyniaBiegow extends Komponent {
         sprzeglo = new Sprzeglo();
     }
 
-    public void zwiekszBieg() {
+    public void zwiekszBieg() throws Exception {
+        sprawdzSprzegloWcisniete();
         if (aktualnyBieg < iloscBiegow) {
             aktualnyBieg++;
         }
     }
 
-    public void zmniejszBieg() {
+    public void zmniejszBieg() throws Exception {
+        sprawdzSprzegloWcisniete();
         if (aktualnyBieg > 0) {
             aktualnyBieg--;
+        }
+    }
+
+    private void sprawdzSprzegloWcisniete() throws Exception {
+        if (!sprzeglo.stanSprzegla) {
+            throw new Exception("Zmiana biegu wymaga wcisnietego sprzegla.");
         }
     }
 }

@@ -1,7 +1,7 @@
 package agh.po.lab5;
 
 public class TestSamochodu {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         Samochod samochod = new Samochod();
 
         samochod.wlacz();

@@ -30,4 +30,26 @@ public class Pozycja {
         this.y += deltaY;
     }
 
+    public void przemiesc(double dt, double V, Pozycja cel) {
+        double deltaX = cel.x - this.x;
+        double deltaY = cel.y - this.y;
+        double odleglosc = Math.hypot(deltaX, deltaY);
+        double dlugoscKroku = dt * V;
+
+        if (odleglosc == 0) {
+            return;
+        }
+
+        if (odleglosc <= dlugoscKroku) {
+            this.x = cel.x;
+            this.y = cel.y;
+            return;
+        }
+
+        aktualizujPozycje(
+                deltaX / odleglosc * dlugoscKroku,
+                deltaY / odleglosc * dlugoscKroku
+        );
+    }
+
 }
